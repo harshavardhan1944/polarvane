@@ -16,14 +16,25 @@ export class ApifyError extends Error {
 }
 
 function token() {
-  const t = (process.env.APIFY_TOKEN ?? "").trim();
-  if (!t) {
+  // Clean up copy-paste mistakes: spaces, quotes, invisible characters, "KEY=value".
+  const raw = (process.env.APIFY_TOKEN ?? "")
+    .replace(/[\u200B-\u200D\uFEFF\u00A0]/g, "")
+    .replace(/^\s*APIFY_TOKEN\s*=/, "")
+    .trim()
+    .replace(/^["']+|["']+$/g, "")
+    .trim();
+  if (!raw) {
     throw new ApifyError(
       "Apify isn’t connected yet. Add APIFY_TOKEN in Vercel’s environment variables.",
       "not_configured",
     );
   }
-  return t;
+  const found = raw.match(/apify_api_[A-Za-z0-9]+/);
+  if (found) return found[0];
+  throw new ApifyError(
+    `The saved APIFY_TOKEN doesn’t look like an Apify token. It should start with “apify_api_” (the saved value is ${raw.length} characters long and starts with “${raw.slice(0, 4)}…”).`,
+    "auth",
+  );
 }
 
 async function apifyFetch(path: string, init?: RequestInit) {
