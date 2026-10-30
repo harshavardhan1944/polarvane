@@ -6,7 +6,13 @@ import "server-only";
 
 const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 // Override with the GEMINI_MODEL setting if Google renames models.
-const MODELS = [process.env.GEMINI_MODEL?.trim(), "gemini-2.5-flash", "gemini-2.5-flash-lite"].filter(
+const MODELS = [
+  process.env.GEMINI_MODEL?.trim(),
+  "gemini-3.5-flash-lite",
+  "gemini-3.5-flash",
+  "gemini-3.1-flash-lite",
+  "gemini-2.5-flash",
+].filter(
   (m): m is string => Boolean(m),
 );
 
@@ -159,7 +165,8 @@ async function classifyOnce(comments: CommentInput[]): Promise<CommentResult[]> 
     if (res.ok) break;
     body = await res.text().catch(() => "");
     console.error(`[polarvane] Gemini ${model} ${res.status}:`, body.slice(0, 500));
-    if (res.status !== 404) break; // only try the next model if this one doesn't exist
+    // Only try the next model if this one doesn't exist / is retired.
+    if (res.status !== 404 && !/no longer available|not found|not supported/i.test(body)) break;
   }
   if (!res) throw new AiError("No AI model configured.", "other");
 
