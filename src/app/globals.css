@@ -2,7 +2,7 @@
 
 /* Polarvane design tokens
    Ink navy base, one polar-blue → aurora-violet accent used sparingly,
-   Instrument Serif for readouts and headlines, Geist for interface text. */
+   Geist throughout. */
 @theme {
   --color-navy-950: #060a17;
   --color-navy-900: #0a1024;
@@ -20,7 +20,6 @@
   --color-negative: #e5534b;
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
-  --font-display: "Instrument Serif", ui-serif, Georgia, serif;
 }
 
 html,
