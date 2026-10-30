@@ -1,5 +1,5 @@
 // Lightweight, dependency-free charts. Pure HTML/CSS, hover tooltips via CSS.
-import type { DayStat, TopicStat } from "@/lib/insights";
+import type { DayStat, TopicStat } from "@/lib/insights-core";
 
 const SENT = [
   { key: "positive", label: "Positive", bar: "bg-positive" },
@@ -137,6 +137,81 @@ export function TrendColumns({ days }: { days: DayStat[] }) {
           </span>
         ))}
       </div>
+    </div>
+  );
+}
+
+const SENT_HEX = { positive: "#1fae7e", neutral: "#6b7a99", negative: "#e5534b" } as const;
+
+// Part-to-whole donut for the three sentiments, with the headline in the middle.
+export function SentimentDonut({ counts, size = 168 }: { counts: Counts; size?: number }) {
+  const total = counts.positive + counts.neutral + counts.negative;
+  const stroke = 16;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const gap = total && SENT.filter((s) => counts[s.key] > 0).length > 1 ? 4 : 0;
+  let offset = 0;
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#18224a" strokeWidth={stroke} />
+        {total > 0 &&
+          SENT.filter((s) => counts[s.key] > 0).map((s) => {
+            const len = (counts[s.key] / total) * c;
+            const seg = (
+              <circle
+                key={s.key}
+                cx={size / 2}
+                cy={size / 2}
+                r={r}
+                fill="none"
+                stroke={SENT_HEX[s.key]}
+                strokeWidth={stroke}
+                strokeDasharray={`${Math.max(0, len - gap)} ${c}`}
+                strokeDashoffset={-offset}
+                className="transition-opacity hover:opacity-80"
+              >
+                <title>
+                  {s.label}: {counts[s.key]} ({pct(counts[s.key], total)}%)
+                </title>
+              </circle>
+            );
+            offset += len;
+            return seg;
+          })}
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+        <span className="text-3xl font-semibold tracking-tight">{pct(counts.positive, total)}%</span>
+        <span className="text-xs text-muted">positive</span>
+      </div>
+    </div>
+  );
+}
+
+export function SentimentRows({ counts }: { counts: Counts }) {
+  const total = counts.positive + counts.neutral + counts.negative;
+  return (
+    <div className="w-full space-y-3">
+      {SENT.map((s) => (
+        <div key={s.key}>
+          <div className="mb-1 flex items-baseline justify-between text-sm">
+            <span className="inline-flex items-center gap-2 text-ink">
+              <span className={`h-2.5 w-2.5 rounded-full ${s.bar}`} />
+              {s.label}
+            </span>
+            <span className="text-ink">
+              <span className="font-semibold">{pct(counts[s.key], total)}%</span>{" "}
+              <span className="text-xs text-faint">{counts[s.key].toLocaleString()}</span>
+            </span>
+          </div>
+          <div className="h-1.5 rounded-full bg-navy-800">
+            <div
+              className={`h-full rounded-full ${s.bar}`}
+              style={{ width: `${pct(counts[s.key], total)}%` }}
+            />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
