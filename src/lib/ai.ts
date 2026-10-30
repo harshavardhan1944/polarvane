@@ -127,24 +127,20 @@ function normaliseTopic(t: string) {
     .slice(0, 40);
 }
 
-async function callGemini(model: string, key: string, comments: CommentInput[]) {
-  const payload = comments.map((c) => ({ id: c.id, text: c.text.slice(0, 1500) }));
+type GeminiRequest = { system: string; user: string; schema: object; temperature?: number };
+
+async function callGemini(model: string, key: string, req: GeminiRequest) {
   try {
     return await fetch(`${API_BASE}/${encodeURIComponent(model)}:generateContent`, {
       method: "POST",
       headers: { "x-goog-api-key": key, "content-type": "application/json" },
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: INSTRUCTIONS }] },
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: `Label these ${payload.length} Instagram comments (JSON):\n${JSON.stringify(payload)}` }],
-          },
-        ],
+        systemInstruction: { parts: [{ text: req.system }] },
+        contents: [{ role: "user", parts: [{ text: req.user }] }],
         generationConfig: {
-          temperature: 0,
+          temperature: req.temperature ?? 0,
           responseMimeType: "application/json",
-          responseSchema: RESPONSE_SCHEMA,
+          responseSchema: req.schema,
         },
         safetySettings: SAFETY,
       }),
@@ -155,13 +151,14 @@ async function callGemini(model: string, key: string, comments: CommentInput[]) 
   }
 }
 
-async function classifyOnce(comments: CommentInput[]): Promise<CommentResult[]> {
+// Sends one request to Gemini and returns the parsed JSON answer.
+export async function geminiJson(req: GeminiRequest): Promise<unknown> {
   const key = apiKey();
   let res: Response | null = null;
   let body = "";
 
   for (const model of MODELS) {
-    res = await callGemini(model, key, comments);
+    res = await callGemini(model, key, req);
     if (res.ok) break;
     body = await res.text().catch(() => "");
     console.error(`[polarvane] Gemini ${model} ${res.status}:`, body.slice(0, 500));
@@ -181,24 +178,33 @@ async function classifyOnce(comments: CommentInput[]): Promise<CommentResult[]> 
     if (res.status === 401 || res.status === 403)
       throw new AiError(`The Gemini key was rejected. Check GEMINI_API_KEY in Vercel.${detail}`, "auth");
     if (res.status === 429)
-      throw new AiError("Free AI limit reached for the moment. Waiting and retrying automatically…", "busy");
-    if (res.status >= 500) throw new AiError("The AI service is busy. Retrying automatically…", "busy");
+      throw new AiError("Free AI limit reached for the moment. Please wait a minute and try again.", "busy");
+    if (res.status >= 500) throw new AiError("The AI service is busy. Please try again shortly.", "busy");
     throw new AiError(`The AI service returned an error (${res.status}).${detail}`, "other");
   }
 
   const json = await res.json();
-  if (json?.promptFeedback?.blockReason) throw new AiError("The AI declined this batch.", "blocked");
+  if (json?.promptFeedback?.blockReason) throw new AiError("The AI declined this request.", "blocked");
   const cand = json?.candidates?.[0];
   if (cand?.finishReason && ["SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII"].includes(cand.finishReason))
-    throw new AiError("The AI declined this batch.", "blocked");
+    throw new AiError("The AI declined this request.", "blocked");
 
   const text: string = (cand?.content?.parts ?? []).map((p: { text?: string }) => p.text ?? "").join("");
-  let results: unknown;
   try {
-    results = JSON.parse(text)?.results;
+    return JSON.parse(text);
   } catch {
-    results = null;
+    throw new AiError("The AI returned an unreadable answer. Please try again.", "bad_output");
   }
+}
+
+async function classifyOnce(comments: CommentInput[]): Promise<CommentResult[]> {
+  const payload = comments.map((c) => ({ id: c.id, text: c.text.slice(0, 1500) }));
+  const parsed = (await geminiJson({
+    system: INSTRUCTIONS,
+    user: `Label these ${payload.length} Instagram comments (JSON):\n${JSON.stringify(payload)}`,
+    schema: RESPONSE_SCHEMA,
+  })) as { results?: unknown };
+  const results = parsed?.results;
   if (!Array.isArray(results)) throw new AiError("The AI returned an unreadable answer. Retrying…", "bad_output");
 
   const wanted = new Set(comments.map((c) => c.id));
