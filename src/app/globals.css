@@ -13,9 +13,9 @@
   --color-faint: #5b6690;
   --color-brand-blue: #4f7cff;
   --color-brand-violet: #8b5cf6;
-  --color-positive: #34d399;
-  --color-neutral: #94a3b8;
-  --color-negative: #f87171;
+  --color-positive: #1fae7e;
+  --color-neutral: #6b7a99;
+  --color-negative: #e5534b;
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }

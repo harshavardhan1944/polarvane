@@ -13,6 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { COMMENT_LIMITS, estimateApifyCost } from "@/lib/pricing";
+import { SentimentBar, SentimentLegend } from "@/components/charts";
 import { analyzeNextBatch, checkCollection, deleteAnalysis, startCollection } from "./actions";
 
 export type AnalysisRowData = {
@@ -282,26 +283,12 @@ export function AnalysisRow({ row }: { row: AnalysisRowData }) {
 
 function SentimentSummary({ s }: { s: NonNullable<AnalysisRowData["summary"]> }) {
   const total = s.positive + s.neutral + s.negative;
-  const pct = (n: number) => (total ? Math.round((n / total) * 100) : 0);
-  const parts = [
-    { key: "Positive", n: s.positive, bar: "bg-positive", text: "text-emerald-300" },
-    { key: "Neutral", n: s.neutral, bar: "bg-neutral", text: "text-slate-300" },
-    { key: "Negative", n: s.negative, bar: "bg-negative", text: "text-red-300" },
-  ];
   return (
     <div className="mt-3 rounded-lg border border-navy-700 bg-navy-900/60 p-3">
-      <div className="flex h-2 overflow-hidden rounded-full bg-navy-700">
-        {parts.map((p) => (
-          <div key={p.key} className={p.bar} style={{ width: `${pct(p.n)}%` }} />
-        ))}
-      </div>
-      <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs">
-        {parts.map((p) => (
-          <span key={p.key} className={p.text}>
-            {p.key} {pct(p.n)}% <span className="text-faint">({p.n})</span>
-          </span>
-        ))}
-        <span className="text-faint">
+      <SentimentBar counts={s} height={8} />
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+        <SentimentLegend counts={s} />
+        <span className="text-xs text-faint">
           {total} comments analyzed{s.failed ? ` · ${s.failed} couldn’t be analyzed` : ""}
         </span>
       </div>
