@@ -96,13 +96,13 @@ export function TalonChat({
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_290px]">
       {/* Chat */}
-      <div className="panel flex h-[calc(100vh-11rem)] min-h-[560px] flex-col overflow-hidden">
+      <div className="panel flex h-[calc(100vh-7rem)] min-h-[560px] flex-col overflow-hidden">
         <div className="flex items-center gap-3 border-b border-navy-700 px-4 py-3">
           <span className="brand-gradient flex h-9 w-9 items-center justify-center rounded-xl shadow-lg shadow-brand-violet/30">
             <Sparkles size={17} className="text-white" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">Talon</p>
+            <p className="font-display text-xl leading-none">Talon</p>
             <p className="flex items-center gap-1 text-[11px] text-emerald-300">
               <ShieldCheck size={11} /> Answers grounded in your comments
             </p>
@@ -142,8 +142,8 @@ export function TalonChat({
                   <Sparkles size={24} className="text-white" />
                 </div>
               </div>
-              <h2 className="mt-5 text-xl font-semibold">
-                What would you like to know about your <span className="brand-text">audience</span>?
+              <h2 className="font-display mt-6 text-3xl leading-tight sm:text-4xl">
+                What would you like to know?
               </h2>
               <p className="mt-2 max-w-md text-sm text-muted">
                 Talon reads your {summary.total.toLocaleString()} analyzed comments and answers with real quotes as
@@ -180,13 +180,11 @@ export function TalonChat({
                   <Sparkles size={14} className="text-white" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="rounded-2xl rounded-tl-md border border-navy-700 bg-navy-900/60 p-4">
+                  <div className="max-w-[68ch] rounded-2xl rounded-tl-md border border-navy-700 bg-navy-850 p-5">
                     <FormattedText text={m.text} />
                     {m.evidence.length > 0 && (
                       <div className="mt-4 border-t border-navy-700 pt-3">
-                        <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-faint">
-                          Evidence from real comments
-                        </p>
+                        <p className="mb-2 text-xs text-muted">Evidence from real comments</p>
                         <div className="grid gap-2 sm:grid-cols-2">
                           {m.evidence.map((e) => (
                             <blockquote
@@ -199,7 +197,7 @@ export function TalonChat({
                                     : "border-neutral"
                               }`}
                             >
-                              <p className="text-xs leading-relaxed text-ink">“{e.text}”</p>
+                              <p className="font-display text-[16px] leading-snug text-ink">“{e.text}”</p>
                               <p className="mt-1.5 flex flex-wrap items-center gap-x-2.5 text-[11px] text-faint">
                                 {e.author_username && <span>@{e.author_username}</span>}
                                 {e.sentiment && <span className="capitalize">{e.sentiment}</span>}
@@ -286,8 +284,8 @@ export function TalonChat({
       {/* Side panel */}
       <aside className="space-y-4">
         <div className="panel p-4">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-faint">What Talon knows</p>
-          <p className="mt-2 text-2xl font-semibold">{summary.total.toLocaleString()}</p>
+          <p className="text-xs text-muted">What Talon knows</p>
+          <p className="font-display num mt-2 text-4xl leading-none">{summary.total.toLocaleString()}</p>
           <p className="text-xs text-muted">
             analyzed comments across {posts.length} {posts.length === 1 ? "post" : "posts"}
           </p>
@@ -318,7 +316,7 @@ export function TalonChat({
         </div>
 
         <div className="panel p-4">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-faint">Try asking</p>
+          <p className="text-xs text-muted">Try asking</p>
           <div className="mt-3 space-y-3">
             {SUGGESTION_GROUPS.map((g) => (
               <div key={g.label}>

@@ -1,23 +1,18 @@
 import Link from "next/link";
-import {
-  ArrowRight,
-  ArrowUpRight,
-  Activity,
-  BarChart3,
-  Heart,
-  Lightbulb,
-  MessageSquareText,
-  Smile,
-  Sparkles,
-  Tags,
-  ThumbsDown,
-  ThumbsUp,
-} from "lucide-react";
+import { ArrowRight, ArrowUpRight, Heart, Sparkles } from "lucide-react";
 import { PostFilter } from "@/components/PostFilter";
 import { SentimentDonut, SentimentRows, TopicBars, TrendColumns } from "@/components/charts";
 import type { CommentRow, KeyInsight, computeInsights } from "@/lib/insights-core";
 
 type Insights = ReturnType<typeof computeInsights>;
+
+function moodOf(net: number) {
+  if (net >= 40) return "overwhelmingly warm";
+  if (net >= 20) return "mostly warm";
+  if (net > -10) return "mixed";
+  if (net > -30) return "leaning critical";
+  return "largely critical";
+}
 
 export function DashboardView({
   posts,
@@ -37,146 +32,137 @@ export function DashboardView({
   const pc = (n: number) => (ins.total ? Math.round((n / ins.total) * 100) : 0);
   const net = pc(ins.sentiment.positive) - pc(ins.sentiment.negative);
   const scope = selected ? posts.find((p) => p.id === selected)?.label ?? "Selected post" : "All analyzed posts";
+  const topTopics = ins.topics.slice(0, 2).map((t) => t.topic);
 
-  const tiles = [
-    {
-      label: "Comments analyzed",
-      value: ins.total.toLocaleString(),
-      sub: `across ${postCount} ${postCount === 1 ? "post" : "posts"}`,
-      icon: MessageSquareText,
-      chip: "bg-brand-blue/15 text-brand-blue",
-    },
-    {
-      label: "Net sentiment",
-      value: `${net > 0 ? "+" : ""}${net}`,
-      sub: "positive % minus negative %",
-      icon: Activity,
-      chip: "bg-brand-violet/15 text-violet-300",
-    },
-    {
-      label: "Positive comments",
-      value: `${pc(ins.sentiment.positive)}%`,
-      sub: `${ins.sentiment.positive.toLocaleString()} comments`,
-      icon: Smile,
-      chip: "bg-positive/15 text-emerald-300",
-    },
-    {
-      label: "Topics found",
-      value: ins.topics.length.toLocaleString(),
-      sub: ins.topics[0] ? `top: ${ins.topics[0].topic}` : "none yet",
-      icon: Tags,
-      chip: "bg-amber-400/10 text-amber-300",
-    },
+  const metrics = [
+    { label: "Comments analyzed", value: ins.total.toLocaleString(), sub: `${postCount} ${postCount === 1 ? "post" : "posts"}` },
+    { label: "Net sentiment", value: `${net > 0 ? "+" : ""}${net}`, sub: "positive minus negative" },
+    { label: "Positive", value: `${pc(ins.sentiment.positive)}%`, sub: `${ins.sentiment.positive.toLocaleString()} comments` },
+    { label: "Topics found", value: ins.topics.length.toLocaleString(), sub: topTopics[0] ? `led by ${topTopics[0]}` : "none yet" },
   ];
 
   return (
     <>
-      {/* Header */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-brand-blue">Audience overview</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">Dashboard</h1>
-          <p className="mt-1 text-sm text-muted">
-            {scope} · real results from {ins.total.toLocaleString()} analyzed comments
+      {/* Readout: the audience in one sentence, built from real numbers */}
+      <header className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+        <div className="max-w-3xl">
+          <p className="text-sm text-muted">{scope}</p>
+          <h1 className="font-display mt-2 text-4xl leading-[1.08] sm:text-5xl">
+            Your audience is {moodOf(net)}.
+          </h1>
+          <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-muted">
+            <span className="num text-ink">{pc(ins.sentiment.positive)}%</span> of{" "}
+            <span className="num text-ink">{ins.total.toLocaleString()}</span> analyzed comments are positive and{" "}
+            <span className="num text-ink">{pc(ins.sentiment.negative)}%</span> negative
+            {topTopics.length > 0 && (
+              <>
+                . The conversation centres on <span className="text-ink">{topTopics.join(" and ")}</span>
+              </>
+            )}
+            .
           </p>
         </div>
         <PostFilter posts={posts} value={selected} />
-      </div>
+      </header>
 
       {notice && <div className="panel mb-4 p-3 text-xs text-amber-200">{notice}</div>}
 
-      {/* KPI tiles */}
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        {tiles.map(({ label, value, sub, icon: Icon, chip }) => (
-          <div key={label} className="panel relative overflow-hidden p-4 sm:p-5">
-            <div className="flex items-start justify-between">
-              <span className="text-xs text-muted">{label}</span>
-              <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${chip}`}>
-                <Icon size={16} />
-              </span>
-            </div>
-            <p className="mt-2 text-3xl font-semibold tracking-tight">{value}</p>
-            <p className="mt-1 truncate text-xs text-faint">{sub}</p>
+      {/* Metric strip: one surface, hairline dividers */}
+      <section className="panel grid grid-cols-2 lg:grid-cols-4">
+        {metrics.map((m, i) => (
+          <div
+            key={m.label}
+            className={`p-5 sm:p-6 ${i % 2 === 1 ? "border-l hairline" : ""} ${i >= 2 ? "border-t hairline lg:border-t-0" : ""} ${
+              i === 2 ? "lg:border-l" : ""
+            }`}
+          >
+            <p className="text-xs text-muted">{m.label}</p>
+            <p className="font-display num mt-2 text-[44px] leading-none">{m.value}</p>
+            <p className="mt-2 truncate text-xs text-faint">{m.sub}</p>
           </div>
         ))}
-      </div>
+      </section>
 
-      {/* Sentiment + key insights */}
-      <div className="mt-4 grid gap-4 lg:grid-cols-5">
-        <Card className="lg:col-span-2" icon={Smile} title="Sentiment" subtitle="How the audience feels about the content">
-          <div className="flex flex-col items-center gap-6 sm:flex-row lg:flex-col xl:flex-row">
-            <SentimentDonut counts={ins.sentiment} />
+      {/* Sentiment + findings */}
+      <section className="panel mt-4 grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+        <div className="p-6">
+          <h2 className="text-sm font-medium">Sentiment</h2>
+          <p className="text-xs text-muted">Share of comments by AI label</p>
+          <div className="mt-6 flex flex-col items-center gap-8 sm:flex-row lg:flex-col xl:flex-row">
+            <SentimentDonut counts={ins.sentiment} size={176} />
             <SentimentRows counts={ins.sentiment} />
           </div>
-        </Card>
-
-        <Card className="lg:col-span-3" icon={Lightbulb} title="Key insights" subtitle="Plain-English findings calculated from your data">
+        </div>
+        <div className="border-t hairline p-6 lg:border-l lg:border-t-0">
+          <h2 className="text-sm font-medium">What stands out</h2>
+          <p className="text-xs text-muted">Findings calculated directly from your numbers</p>
           {insights.length === 0 ? (
-            <p className="text-sm text-muted">Not enough data for insights yet.</p>
+            <p className="mt-6 text-sm text-muted">Not enough data for findings yet.</p>
           ) : (
-            <ul className="grid gap-3 sm:grid-cols-2">
+            <ul className="mt-4 divide-y divide-navy-700">
               {insights.map((k) => (
-                <li key={k.title} className="rounded-xl border border-navy-700 bg-navy-900/50 p-4">
+                <li key={k.title} className="flex gap-4 py-4 first:pt-2 last:pb-0">
                   <span
-                    className={`mb-2 inline-flex h-7 w-7 items-center justify-center rounded-lg ${
+                    aria-hidden
+                    className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
                       k.tone === "positive"
-                        ? "bg-positive/15 text-emerald-300"
+                        ? "bg-positive"
                         : k.tone === "negative"
-                          ? "bg-negative/15 text-red-300"
+                          ? "bg-negative"
                           : k.tone === "neutral"
-                            ? "bg-neutral/20 text-slate-300"
-                            : "bg-brand-blue/15 text-brand-blue"
+                            ? "bg-neutral"
+                            : "bg-brand-blue"
                     }`}
-                  >
-                    {k.tone === "positive" ? (
-                      <ThumbsUp size={14} />
-                    ) : k.tone === "negative" ? (
-                      <ThumbsDown size={14} />
-                    ) : (
-                      <BarChart3 size={14} />
-                    )}
-                  </span>
-                  <p className="text-sm font-medium text-ink">{k.title}</p>
-                  <p className="mt-1 text-xs leading-relaxed text-muted">{k.detail}</p>
+                  />
+                  <div>
+                    <p className="text-[15px] text-ink">{k.title}</p>
+                    <p className="mt-0.5 text-sm leading-relaxed text-muted">{k.detail}</p>
+                  </div>
                 </li>
               ))}
             </ul>
           )}
-        </Card>
-      </div>
+        </div>
+      </section>
 
       {/* Topics + Ask Talon */}
-      <div className="mt-4 grid gap-4 lg:grid-cols-5">
-        <Card className="lg:col-span-3" icon={Tags} title="Topic distribution" subtitle="What comments talk about · colour shows each topic’s sentiment mix">
+      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+        <section className="panel p-6">
+          <h2 className="text-sm font-medium">Topics</h2>
+          <p className="mb-5 text-xs text-muted">Ranked by how many comments mention them, coloured by sentiment</p>
           <TopicBars topics={ins.topics} max={8} />
-        </Card>
+        </section>
 
-        <div className="panel relative overflow-hidden p-5 lg:col-span-2">
-          <div className="brand-gradient pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full opacity-25 blur-3xl" />
-          <div className="relative">
-            <div className="flex items-center gap-2">
+        <section className="relative rounded-2xl p-px">
+          <div className="brand-gradient absolute inset-0 rounded-2xl opacity-60" aria-hidden />
+          <div className="relative h-full rounded-[15px] bg-navy-900 p-6">
+            <div className="flex items-center gap-2.5">
               <span className="brand-gradient flex h-8 w-8 items-center justify-center rounded-lg">
                 <Sparkles size={15} className="text-white" />
               </span>
-              <h2 className="text-sm font-semibold">Ask Talon</h2>
+              <h2 className="font-display text-2xl leading-none">Ask Talon</h2>
             </div>
-            <p className="mt-2 text-xs text-muted">Get answers and content ideas backed by real comments.</p>
-            <form action="/copilot" method="get" className="mt-4">
+            <p className="mt-3 text-sm text-muted">Answers and content ideas, backed by quotes from your comments.</p>
+            <form action="/copilot" method="get" className="mt-5">
               <input type="hidden" name="post" value={selected} />
-              <div className="flex gap-2 rounded-xl border border-navy-600 bg-navy-900/80 p-1.5 focus-within:border-brand-blue">
+              <label htmlFor="ask-talon" className="sr-only">
+                Question for Talon
+              </label>
+              <div className="flex gap-2 rounded-xl border border-navy-600 bg-navy-950 p-1.5 focus-within:border-brand-blue">
                 <input
+                  id="ask-talon"
                   name="q"
                   required
                   maxLength={1000}
-                  placeholder="Ask about your audience…"
+                  placeholder="What should my next post be about?"
                   className="min-w-0 flex-1 bg-transparent px-2 text-sm outline-none placeholder:text-faint"
                 />
-                <button type="submit" className="brand-gradient rounded-lg px-3 py-1.5 text-xs font-medium text-white">
+                <button type="submit" className="brand-gradient rounded-lg px-3.5 py-1.5 text-sm font-medium text-white">
                   Ask
                 </button>
               </div>
             </form>
-            <div className="mt-4 space-y-1.5">
+            <div className="mt-5 divide-y divide-navy-700 border-t hairline">
               {[
                 "What do people like most, and what do they dislike?",
                 "Give me 5 content ideas based on these comments.",
@@ -185,128 +171,96 @@ export function DashboardView({
                 <Link
                   key={q}
                   href={`/copilot?q=${encodeURIComponent(q)}${selected ? `&post=${selected}` : ""}`}
-                  className="group flex items-center justify-between rounded-lg border border-navy-700 bg-navy-900/40 px-3 py-2 text-xs text-muted transition-colors hover:border-brand-blue/50 hover:text-ink"
+                  className="group flex items-center justify-between gap-3 py-3 text-sm text-muted transition-colors hover:text-ink"
                 >
                   {q}
-                  <ArrowUpRight size={13} className="shrink-0 text-faint group-hover:text-brand-blue" />
+                  <ArrowUpRight size={15} className="shrink-0 text-faint transition-colors group-hover:text-brand-blue" />
                 </Link>
               ))}
             </div>
           </div>
-        </div>
+        </section>
       </div>
 
       {/* Trend */}
-      <Card
-        className="mt-4"
-        icon={Activity}
-        title="Comments over time"
-        subtitle={`Daily volume by sentiment · ${ins.timestamped.toLocaleString()} of ${ins.total.toLocaleString()} comments have a date`}
-      >
+      <section className="panel mt-4 p-6">
+        <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-sm font-medium">Comments over time</h2>
+            <p className="text-xs text-muted">Daily volume, split by sentiment</p>
+          </div>
+          <p className="num text-xs text-faint">
+            {ins.timestamped.toLocaleString()} of {ins.total.toLocaleString()} comments dated
+          </p>
+        </div>
         {ins.days.length >= 2 ? (
           <TrendColumns days={ins.days} />
         ) : (
-          <p className="rounded-lg border border-dashed border-navy-600 p-6 text-center text-sm text-muted">
+          <p className="rounded-xl border border-dashed border-navy-600 p-8 text-center text-sm text-muted">
             {ins.days.length === 1
               ? "All dated comments are from a single day, so there’s no trend yet."
               : "These comments don’t include dates, so a trend can’t be shown."}{" "}
-            Analyze more posts to see changes over time.
+            Analyze more posts to see change over time.
           </p>
         )}
-      </Card>
+      </section>
 
-      {/* Top comments */}
+      {/* Voices */}
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <TopComments title="Most-liked positive comments" rows={ins.topPositive} tone="positive" />
-        <TopComments title="Most-liked negative comments" rows={ins.topNegative} tone="negative" />
+        <Voices title="Most-liked praise" rows={ins.topPositive} tone="positive" />
+        <Voices title="Most-liked criticism" rows={ins.topNegative} tone="negative" />
       </div>
     </>
   );
 }
 
-function Card({
-  title,
-  subtitle,
-  icon: Icon,
-  className = "",
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
-  className?: string;
-  children: React.ReactNode;
-}) {
+function Voices({ title, rows, tone }: { title: string; rows: CommentRow[]; tone: "positive" | "negative" }) {
   return (
-    <section className={`panel p-5 ${className}`}>
-      <div className="mb-4 flex items-start gap-2.5">
-        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-navy-700/70">
-          <Icon size={14} className="text-brand-blue" />
-        </span>
-        <div>
-          <h2 className="text-sm font-semibold">{title}</h2>
-          {subtitle && <p className="text-xs text-muted">{subtitle}</p>}
-        </div>
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function TopComments({ title, rows, tone }: { title: string; rows: CommentRow[]; tone: "positive" | "negative" }) {
-  return (
-    <Card title={title} icon={tone === "positive" ? ThumbsUp : ThumbsDown} subtitle="Ranked by likes">
+    <section className="panel p-6">
+      <h2 className="flex items-center gap-2 text-sm font-medium">
+        <span className={`h-2 w-2 rounded-full ${tone === "positive" ? "bg-positive" : "bg-negative"}`} />
+        {title}
+      </h2>
       {rows.length === 0 ? (
-        <p className="text-sm text-muted">No {tone} comments found.</p>
+        <p className="mt-4 text-sm text-muted">No {tone === "positive" ? "positive" : "negative"} comments found.</p>
       ) : (
-        <ul className="space-y-2.5">
+        <ul className="mt-2 divide-y divide-navy-700">
           {rows.map((r) => (
-            <li key={r.id} className="flex gap-3 rounded-xl border border-navy-700 bg-navy-900/50 p-3">
-              <span
-                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold uppercase ${
-                  tone === "positive" ? "bg-positive/15 text-emerald-300" : "bg-negative/15 text-red-300"
-                }`}
-              >
-                {(r.author_username ?? "?").charAt(0)}
-              </span>
-              <div className="min-w-0">
-                <p className="text-sm leading-relaxed text-ink">{r.text}</p>
-                <p className="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-faint">
-                  {r.author_username && <span>@{r.author_username}</span>}
-                  {r.like_count !== null && (
-                    <span className="inline-flex items-center gap-1">
-                      <Heart size={11} /> {r.like_count.toLocaleString()}
-                    </span>
-                  )}
-                  {r.topics.length > 0 && <span className="capitalize">{r.topics.join(" · ")}</span>}
-                </p>
-              </div>
+            <li key={r.id} className="py-4 last:pb-0">
+              <blockquote className="font-display text-[19px] leading-snug text-ink">“{r.text}”</blockquote>
+              <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-faint">
+                {r.author_username && <span>@{r.author_username}</span>}
+                {r.like_count !== null && (
+                  <span className="num inline-flex items-center gap-1">
+                    <Heart size={11} /> {r.like_count.toLocaleString()}
+                  </span>
+                )}
+                {r.topics.length > 0 && <span className="capitalize">{r.topics.join(", ")}</span>}
+              </p>
             </li>
           ))}
         </ul>
       )}
-    </Card>
+    </section>
   );
 }
 
 export function DashboardEmpty({ failed }: { failed: boolean }) {
   return (
-    <div className="panel relative overflow-hidden p-6 sm:p-10">
-      <div className="brand-gradient pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full opacity-20 blur-3xl" />
-      <p className="text-xs font-medium uppercase tracking-wider text-brand-blue">Get started</p>
-      <h2 className="mt-2 text-2xl font-semibold">
-        {failed ? "Couldn’t load your data" : "Analyze your first Instagram post"}
-      </h2>
-      <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
+    <div className="py-10">
+      <h1 className="font-display max-w-2xl text-5xl leading-[1.05]">
+        {failed ? "We couldn’t load your data." : "Find out what your audience really thinks."}
+      </h1>
+      <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-muted">
         {failed
-          ? "Please refresh the page. If this keeps happening, check that the database setup script was run."
-          : "Paste a public post or Reel link. Polarvane collects the comments, labels each one as positive, neutral or negative, and groups them into topics. Your dashboard fills in once an analysis is completed."}
+          ? "Refresh the page. If this keeps happening, check that the database setup script was run in Supabase."
+          : "Paste a public Instagram post or Reel link. Polarvane collects the comments, labels each one as positive, neutral or negative, and groups them into topics. This page fills in once your first analysis finishes."}
       </p>
       <Link
         href="/analyze"
-        className="brand-gradient mt-6 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white shadow-lg shadow-brand-violet/20 hover:opacity-95"
+        className="brand-gradient mt-7 inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-brand-violet/20 hover:opacity-95"
       >
-        New analysis <ArrowRight size={15} />
+        Analyze a post <ArrowRight size={15} />
       </Link>
     </div>
   );

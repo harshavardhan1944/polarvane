@@ -14,12 +14,22 @@ import {
 } from "lucide-react";
 import { Logo } from "./Logo";
 
-const NAV = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/analyze", label: "New analysis", icon: Link2 },
-  { href: "/comments", label: "Comments", icon: MessageSquareText },
-  { href: "/copilot", label: "Talon Copilot", icon: Sparkles },
-  { href: "/integrations", label: "Integrations", icon: Plug },
+const NAV_GROUPS = [
+  {
+    label: "Insights",
+    items: [
+      { href: "/", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/copilot", label: "Talon copilot", icon: Sparkles },
+      { href: "/comments", label: "Comments", icon: MessageSquareText },
+    ],
+  },
+  {
+    label: "Data",
+    items: [
+      { href: "/analyze", label: "Analyze a post", icon: Link2 },
+      { href: "/integrations", label: "Integrations", icon: Plug },
+    ],
+  },
 ];
 
 export function Sidebar({ footer }: { footer: React.ReactNode }) {
@@ -27,28 +37,32 @@ export function Sidebar({ footer }: { footer: React.ReactNode }) {
   const [open, setOpen] = useState(false);
 
   const nav = (
-    <nav className="flex flex-col gap-1">
-      {NAV.map(({ href, label, icon: Icon }) => {
-        const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
-        return (
-          <Link
-            key={href}
-            href={href}
-            onClick={() => setOpen(false)}
-            className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
-              active
-                ? "bg-navy-700/70 text-ink"
-                : "text-muted hover:bg-navy-800 hover:text-ink"
-            }`}
-          >
-            <Icon
-              size={17}
-              className={active ? "text-brand-blue" : "text-faint group-hover:text-muted"}
-            />
-            {label}
-          </Link>
-        );
-      })}
+    <nav className="flex flex-col gap-6">
+      {NAV_GROUPS.map((g) => (
+        <div key={g.label}>
+          <p className="mb-1.5 px-3 text-xs text-faint">{g.label}</p>
+          <div className="flex flex-col gap-0.5">
+            {g.items.map(({ href, label, icon: Icon }) => {
+              const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={() => setOpen(false)}
+                  aria-current={active ? "page" : undefined}
+                  className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+                    active ? "bg-navy-800 text-ink" : "text-muted hover:bg-navy-850 hover:text-ink"
+                  }`}
+                >
+                  {active && <span className="brand-gradient absolute -left-4 top-1.5 bottom-1.5 w-[3px] rounded-r-full" />}
+                  <Icon size={16} className={active ? "text-brand-blue" : "text-faint group-hover:text-muted"} />
+                  {label}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </nav>
   );
 
@@ -88,13 +102,10 @@ export function Sidebar({ footer }: { footer: React.ReactNode }) {
       )}
 
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-navy-700 bg-navy-900/80 p-4 lg:flex">
-        <div className="mb-8 px-2 pt-1">
+      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-navy-700 bg-navy-950/70 p-4 backdrop-blur lg:flex">
+        <div className="mb-9 px-2 pt-1">
           <Logo />
         </div>
-        <p className="mb-2 px-3 text-[11px] font-medium uppercase tracking-wider text-faint">
-          Workspace
-        </p>
         {nav}
         <div className="mt-auto">{footer}</div>
       </aside>

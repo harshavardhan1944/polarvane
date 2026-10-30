@@ -52,10 +52,7 @@ export default async function CopilotPage(props: PageProps<"/copilot">) {
 
   return (
     <>
-      <div className="mb-5">
-        <p className="text-xs font-medium uppercase tracking-wider text-brand-blue">AI copilot</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">Talon</h1>
-      </div>
+      <h1 className="sr-only">Talon copilot</h1>
       <TalonChat key={`${q}|${post}`} posts={posts} summary={summary} initialQuestion={q} initialPost={post} />
     </>
   );

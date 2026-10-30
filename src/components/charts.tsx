@@ -61,12 +61,14 @@ export function TopicBars({ topics, max = 10 }: { topics: TopicStat[]; max?: num
   if (shown.length === 0)
     return <p className="text-sm text-muted">No clear topics were found in these comments.</p>;
   return (
-    <div className="space-y-3">
-      {shown.map((t) => (
-        <div key={t.topic}>
-          <div className="mb-1 flex items-baseline justify-between text-xs">
+    <div className="space-y-4">
+      {shown.map((t, i) => (
+        <div key={t.topic} className="grid grid-cols-[1.5rem_1fr] items-start gap-2">
+          <span className="num pt-0.5 text-xs text-faint">{i + 1}</span>
+          <div>
+          <div className="mb-1.5 flex items-baseline justify-between text-sm">
             <span className="capitalize text-ink">{t.topic}</span>
-            <span className="text-muted">
+            <span className="num text-xs text-muted">
               {t.total.toLocaleString()} {t.total === 1 ? "comment" : "comments"} ·{" "}
               <span className="text-faint">{pct(t.positive, t.total)}% positive</span>
             </span>
@@ -85,6 +87,7 @@ export function TopicBars({ topics, max = 10 }: { topics: TopicStat[]; max?: num
                 </div>
               ))}
             </div>
+          </div>
           </div>
         </div>
       ))}
@@ -154,7 +157,7 @@ export function SentimentDonut({ counts, size = 168 }: { counts: Counts; size?: 
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#18224a" strokeWidth={stroke} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#1c2650" strokeWidth={stroke} />
         {total > 0 &&
           SENT.filter((s) => counts[s.key] > 0).map((s) => {
             const len = (counts[s.key] / total) * c;
@@ -179,9 +182,22 @@ export function SentimentDonut({ counts, size = 168 }: { counts: Counts; size?: 
             offset += len;
             return seg;
           })}
+        {total > 0 && (
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            fill="none"
+            stroke="#0a1024"
+            strokeWidth={stroke + 2}
+            strokeDasharray={`${c} ${c}`}
+            className="pv-ring-cover"
+            style={{ ["--pv-c" as string]: `${-c}` }}
+          />
+        )}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-        <span className="text-3xl font-semibold tracking-tight">{pct(counts.positive, total)}%</span>
+        <span className="font-display num text-5xl leading-none">{pct(counts.positive, total)}%</span>
         <span className="text-xs text-muted">positive</span>
       </div>
     </div>

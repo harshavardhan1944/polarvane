@@ -22,12 +22,10 @@ export default async function LoginPage(props: PageProps<"/login">) {
         <div className="brand-gradient pointer-events-none absolute -left-40 bottom-[-12rem] h-[30rem] w-[30rem] rounded-full opacity-25 blur-3xl" />
         <div className="flex items-center gap-2.5">
           <LogoMark />
-          <span className="text-lg font-semibold">Polarvane</span>
+          <span className="font-display text-2xl leading-none">Polarvane</span>
         </div>
         <div className="relative max-w-md">
-          <h2 className="text-4xl font-semibold leading-tight tracking-tight">
-            Know what your audience <span className="brand-text">really</span> thinks.
-          </h2>
+          <h2 className="font-display text-6xl leading-[1.02]">Know what your audience really thinks.</h2>
           <p className="mt-4 text-muted">
             AI sentiment and topic analysis for Instagram comments, built for creators, talent
             teams and brands.
@@ -41,7 +39,7 @@ export default async function LoginPage(props: PageProps<"/login">) {
         <div className="w-full max-w-sm">
           <div className="mb-8 flex items-center gap-2.5 lg:hidden">
             <LogoMark />
-            <span className="text-lg font-semibold">Polarvane</span>
+            <span className="font-display text-2xl leading-none">Polarvane</span>
           </div>
           <LoginForm next={next} setupMode={isSetupMode} initialError={error} />
         </div>

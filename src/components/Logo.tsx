@@ -18,7 +18,7 @@ export function Logo() {
   return (
     <div className="flex items-center gap-2.5">
       <LogoMark />
-      <span className="text-[17px] font-semibold tracking-tight">Polarvane</span>
+      <span className="font-display text-[23px] leading-none">Polarvane</span>
     </div>
   );
 }
