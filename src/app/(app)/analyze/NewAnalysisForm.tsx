@@ -76,7 +76,9 @@ export function NewAnalysisForm() {
       {!pending && state.status === "created" && <Message tone="success">{state.message}</Message>}
 
       <p className="mt-4 text-xs leading-relaxed text-faint">
-        Works with public posts and Reels only. Tip: in Instagram, tap <b>Share → Copy link</b>.
+        Works with public posts and Reels only. Tip: in Instagram, tap <b>Share → Copy link</b>. AI analysis
+        currently uses Google Gemini’s free plan, under which Google may use submitted comments to improve its
+        products.
       </p>
     </div>
   );

@@ -12,8 +12,33 @@ export default async function AnalyzePage() {
     .select("id, post_url, shortcode, post_type, status, error_message, comments_collected, comment_limit, created_at")
     .order("created_at", { ascending: false })
     .limit(50);
-  const rows: AnalysisRowData[] = ((data ?? []) as Omit<AnalysisRowData, "created_label">[]).map((r) => ({
+  const base = (data ?? []) as Omit<AnalysisRowData, "created_label" | "summary">[];
+
+  // Real counts straight from the database for each finished analysis.
+  const summaries = new Map<string, AnalysisRowData["summary"]>();
+  await Promise.all(
+    base
+      .filter((r) => r.status === "completed")
+      .map(async (r) => {
+        const count = async (sentiment: string | null) => {
+          let q = supabase.from("comments").select("id", { count: "exact", head: true }).eq("analysis_id", r.id);
+          q = sentiment ? q.eq("sentiment", sentiment) : q.not("analysis_error", "is", null);
+          const { count: c } = await q;
+          return c ?? 0;
+        };
+        const [positive, neutral, negative, failed] = await Promise.all([
+          count("positive"),
+          count("neutral"),
+          count("negative"),
+          count(null),
+        ]);
+        summaries.set(r.id, { positive, neutral, negative, failed });
+      }),
+  );
+
+  const rows: AnalysisRowData[] = base.map((r) => ({
     ...r,
+    summary: summaries.get(r.id) ?? null,
     created_label: new Date(r.created_at).toLocaleString("en-IN", {
       dateStyle: "medium",
       timeStyle: "short",

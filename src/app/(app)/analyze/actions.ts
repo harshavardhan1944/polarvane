@@ -3,6 +3,7 @@
 import { refresh } from "next/cache";
 import { parseInstagramUrl } from "@/lib/instagram";
 import { ApifyError, getDatasetItems, getRun, mapApifyItems, startCommentRun } from "@/lib/apify";
+import { AiError, classifyComments } from "@/lib/ai";
 import { COMMENT_LIMITS } from "@/lib/pricing";
 import { createClient } from "@/lib/supabase/server";
 
@@ -221,4 +222,104 @@ export async function checkCollection(id: string): Promise<CollectionResult> {
     console.error("[polarvane] check collection failed:", err);
     return fail(err instanceof ApifyError ? err.message : "Something went wrong while collecting comments.");
   }
+}
+
+// ---------------- Step 4: AI sentiment + topic analysis ----------------
+
+const AI_BATCH_SIZE = 40;
+
+export type AnalyzeResult =
+  | { ok: true; status: string; analyzed: number; total: number; retryLater?: string }
+  | { ok: false; message: string };
+
+export async function analyzeNextBatch(id: string): Promise<AnalyzeResult> {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return { ok: false, message: "Invalid request." };
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "Your session has expired. Please sign in again." };
+
+  const { data: analysis } = await supabase
+    .from("analyses")
+    .select("id, status, comments_collected")
+    .eq("id", id)
+    .maybeSingle();
+  if (!analysis) return { ok: false, message: "Post not found." };
+
+  const progress = async () => {
+    const { count: analyzed } = await supabase
+      .from("comments")
+      .select("id", { count: "exact", head: true })
+      .eq("analysis_id", id)
+      .not("sentiment", "is", null);
+    const { count: total } = await supabase
+      .from("comments")
+      .select("id", { count: "exact", head: true })
+      .eq("analysis_id", id);
+    return { analyzed: analyzed ?? 0, total: total ?? 0 };
+  };
+
+  if (analysis.status !== "analyzing") {
+    const p = await progress();
+    return { ok: true, status: analysis.status, ...p };
+  }
+
+  const { data: batch, error } = await supabase
+    .from("comments")
+    .select("id, text")
+    .eq("analysis_id", id)
+    .is("sentiment", null)
+    .is("analysis_error", null)
+    .limit(AI_BATCH_SIZE);
+  if (error) {
+    console.error("[polarvane] loading comments failed:", error);
+    return { ok: false, message: "Couldn’t load comments for analysis. Please refresh." };
+  }
+
+  if (batch && batch.length > 0) {
+    let results;
+    try {
+      results = await classifyComments(batch);
+    } catch (err) {
+      if (err instanceof AiError && (err.kind === "busy" || err.kind === "bad_output")) {
+        const p = await progress();
+        return { ok: true, status: "analyzing", ...p, retryLater: err.message };
+      }
+      console.error("[polarvane] AI analysis failed:", err);
+      return { ok: false, message: err instanceof AiError ? err.message : "AI analysis failed. Please try again." };
+    }
+
+    const returned = new Set(results.map((r) => r.id));
+    await Promise.all([
+      ...results.map((r) =>
+        supabase
+          .from("comments")
+          .update({ sentiment: r.sentiment, sentiment_confidence: r.confidence, topics: r.topics })
+          .eq("id", r.id),
+      ),
+      // Never guess: comments the AI skipped are marked, not given a made-up label.
+      ...batch
+        .filter((c) => !returned.has(c.id))
+        .map((c) =>
+          supabase.from("comments").update({ analysis_error: "AI did not return a result" }).eq("id", c.id),
+        ),
+    ]);
+  }
+
+  const p = await progress();
+  const { count: remaining } = await supabase
+    .from("comments")
+    .select("id", { count: "exact", head: true })
+    .eq("analysis_id", id)
+    .is("sentiment", null)
+    .is("analysis_error", null);
+
+  const done = (remaining ?? 0) === 0;
+  await supabase
+    .from("analyses")
+    .update({ comments_analyzed: p.analyzed, ...(done ? { status: "completed" } : {}) })
+    .eq("id", id);
+  if (done) refresh();
+  return { ok: true, status: done ? "completed" : "analyzing", ...p };
 }
