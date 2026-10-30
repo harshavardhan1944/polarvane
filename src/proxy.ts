@@ -20,6 +20,17 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/setup-required", request.url));
   }
 
+  try {
+    return await checkSession(request, pathname, isPublic);
+  } catch (err) {
+    // Never show a blank server error: log it and fail safely to the login page.
+    console.error("[polarvane] session check failed:", err);
+    if (isPublic) return NextResponse.next();
+    return NextResponse.redirect(new URL("/login?error=service", request.url));
+  }
+}
+
+async function checkSession(request: NextRequest, pathname: string, isPublic: boolean) {
   let response = NextResponse.next({ request });
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {

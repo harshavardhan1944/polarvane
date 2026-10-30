@@ -33,7 +33,11 @@ export function LoginForm({
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(
-    initialError ? "That sign-in link didn’t work. Please try again." : null,
+    initialError === "service"
+      ? "We couldn’t reach the login service. Please try again in a moment."
+      : initialError
+        ? "That sign-in link didn’t work. Please try again."
+        : null,
   );
   const [notice, setNotice] = useState<string | null>(null);
 
