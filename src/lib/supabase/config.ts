@@ -2,13 +2,31 @@
 // data is protected by Row Level Security rules in the database.
 // Secret keys (Apify, AI, Supabase service role) must NEVER use the NEXT_PUBLIC_ prefix.
 
-// Clean up common copy-paste mistakes: spaces, quotes, trailing slashes.
+// Polarvane's own Supabase project. Both values are PUBLIC by design (every
+// visitor's browser receives them), so keeping them in code is safe. Hosting
+// settings can override them, but a mistyped setting falls back to these.
+const DEFAULT_URL = "https://zxzrtjhzckxgwzyphahg.supabase.co";
+const DEFAULT_KEY = "sb_publishable_FHw2BuZgU68r5GTPyFZ6SQ_zceQhOZH";
+
+// Clean up copy-paste mistakes: spaces, quotes, invisible characters,
+// or "KEY=value" pasted into the value box.
 function clean(value: string | undefined) {
-  return (value ?? "").trim().replace(/^["']+|["']+$/g, "").trim();
+  return (value ?? "")
+    .replace(/[\u200B-\u200D\uFEFF\u00A0]/g, "")
+    .replace(/^[A-Z_]+=/, "")
+    .trim()
+    .replace(/^["']+|["']+$/g, "")
+    .trim();
 }
 
-const rawUrl = clean(process.env.NEXT_PUBLIC_SUPABASE_URL).replace(/\/+$/, "");
-const rawKey = clean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+function pickUrl(value: string | undefined) {
+  const match = clean(value).match(/https?:\/\/[^\s"'<>]+/);
+  const url = match ? match[0].replace(/\/+$/, "") : "";
+  return isValidUrl(url) ? url : DEFAULT_URL;
+}
+
+const rawUrl = pickUrl(process.env.NEXT_PUBLIC_SUPABASE_URL);
+const rawKey = clean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) || DEFAULT_KEY;
 
 function isValidUrl(u: string) {
   try {
