@@ -197,7 +197,7 @@ export function SentimentDonut({ counts, size = 168 }: { counts: Counts; size?: 
         )}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-        <span className="font-display num text-5xl leading-none">{pct(counts.positive, total)}%</span>
+        <span className="font-display num text-4xl leading-none">{pct(counts.positive, total)}%</span>
         <span className="text-xs text-muted">positive</span>
       </div>
     </div>

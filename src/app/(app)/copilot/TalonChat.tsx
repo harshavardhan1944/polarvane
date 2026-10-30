@@ -102,7 +102,7 @@ export function TalonChat({
             <Sparkles size={17} className="text-white" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="font-display text-xl leading-none">Talon</p>
+            <p className="text-sm font-semibold">Talon</p>
             <p className="flex items-center gap-1 text-[11px] text-emerald-300">
               <ShieldCheck size={11} /> Answers grounded in your comments
             </p>
@@ -142,8 +142,8 @@ export function TalonChat({
                   <Sparkles size={24} className="text-white" />
                 </div>
               </div>
-              <h2 className="font-display mt-6 text-3xl leading-tight sm:text-4xl">
-                What would you like to know?
+              <h2 className="font-display mt-6 text-3xl leading-tight">
+                What would you like to know about your <span className="brand-text">audience</span>?
               </h2>
               <p className="mt-2 max-w-md text-sm text-muted">
                 Talon reads your {summary.total.toLocaleString()} analyzed comments and answers with real quotes as
@@ -197,7 +197,7 @@ export function TalonChat({
                                     : "border-neutral"
                               }`}
                             >
-                              <p className="font-display text-[16px] leading-snug text-ink">“{e.text}”</p>
+                              <p className="text-sm leading-relaxed text-ink">“{e.text}”</p>
                               <p className="mt-1.5 flex flex-wrap items-center gap-x-2.5 text-[11px] text-faint">
                                 {e.author_username && <span>@{e.author_username}</span>}
                                 {e.sentiment && <span className="capitalize">{e.sentiment}</span>}
@@ -285,7 +285,7 @@ export function TalonChat({
       <aside className="space-y-4">
         <div className="panel p-4">
           <p className="text-xs text-muted">What Talon knows</p>
-          <p className="font-display num mt-2 text-4xl leading-none">{summary.total.toLocaleString()}</p>
+          <p className="font-display num mt-2 text-3xl leading-none">{summary.total.toLocaleString()}</p>
           <p className="text-xs text-muted">
             analyzed comments across {posts.length} {posts.length === 1 ? "post" : "posts"}
           </p>

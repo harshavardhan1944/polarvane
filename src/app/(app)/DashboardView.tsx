@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight, Heart, Sparkles } from "lucide-react";
+import { Activity, ArrowRight, ArrowUpRight, Heart, MessageSquareText, Smile, Sparkles, Tags } from "lucide-react";
 import { PostFilter } from "@/components/PostFilter";
 import { SentimentDonut, SentimentRows, TopicBars, TrendColumns } from "@/components/charts";
 import type { CommentRow, KeyInsight, computeInsights } from "@/lib/insights-core";
@@ -35,10 +35,38 @@ export function DashboardView({
   const topTopics = ins.topics.slice(0, 2).map((t) => t.topic);
 
   const metrics = [
-    { label: "Comments analyzed", value: ins.total.toLocaleString(), sub: `${postCount} ${postCount === 1 ? "post" : "posts"}` },
-    { label: "Net sentiment", value: `${net > 0 ? "+" : ""}${net}`, sub: "positive minus negative" },
-    { label: "Positive", value: `${pc(ins.sentiment.positive)}%`, sub: `${ins.sentiment.positive.toLocaleString()} comments` },
-    { label: "Topics found", value: ins.topics.length.toLocaleString(), sub: topTopics[0] ? `led by ${topTopics[0]}` : "none yet" },
+    {
+      label: "Comments analyzed",
+      value: ins.total.toLocaleString(),
+      sub: `across ${postCount} ${postCount === 1 ? "post" : "posts"}`,
+      icon: MessageSquareText,
+      chip: "bg-brand-blue/15 text-[#8fb0ff] ring-brand-blue/30",
+      glow: "rgba(91,140,255,0.45)",
+    },
+    {
+      label: "Net sentiment",
+      value: `${net > 0 ? "+" : ""}${net}`,
+      sub: "positive % minus negative %",
+      icon: Activity,
+      chip: "bg-brand-violet/15 text-[#c3b0ff] ring-brand-violet/30",
+      glow: "rgba(156,124,255,0.45)",
+    },
+    {
+      label: "Positive comments",
+      value: `${pc(ins.sentiment.positive)}%`,
+      sub: `${ins.sentiment.positive.toLocaleString()} comments`,
+      icon: Smile,
+      chip: "bg-positive/15 text-emerald-300 ring-positive/30",
+      glow: "rgba(31,174,126,0.4)",
+    },
+    {
+      label: "Topics found",
+      value: ins.topics.length.toLocaleString(),
+      sub: topTopics[0] ? `top: ${topTopics[0]}` : "none yet",
+      icon: Tags,
+      chip: "bg-amber-400/10 text-amber-300 ring-amber-400/30",
+      glow: "rgba(251,191,36,0.3)",
+    },
   ];
 
   return (
@@ -46,9 +74,11 @@ export function DashboardView({
       {/* Readout: the audience in one sentence, built from real numbers */}
       <header className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-3xl">
-          <p className="text-sm text-muted">{scope}</p>
-          <h1 className="font-display mt-2 text-4xl leading-[1.08] sm:text-5xl">
-            Your audience is {moodOf(net)}.
+          <p className="inline-flex items-center gap-2 rounded-full border border-navy-600 bg-navy-900/60 px-3 py-1 text-xs text-muted">
+            <span className="h-1.5 w-1.5 rounded-full bg-positive" /> {scope}
+          </p>
+          <h1 className="font-display mt-4 text-4xl leading-[1.1] sm:text-[44px]">
+            Your audience is <span className="brand-text">{moodOf(net)}</span>.
           </h1>
           <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-muted">
             <span className="num text-ink">{pc(ins.sentiment.positive)}%</span> of{" "}
@@ -67,18 +97,18 @@ export function DashboardView({
 
       {notice && <div className="panel mb-4 p-3 text-xs text-amber-200">{notice}</div>}
 
-      {/* Metric strip: one surface, hairline dividers */}
-      <section className="panel grid grid-cols-2 lg:grid-cols-4">
-        {metrics.map((m, i) => (
-          <div
-            key={m.label}
-            className={`p-5 sm:p-6 ${i % 2 === 1 ? "border-l hairline" : ""} ${i >= 2 ? "border-t hairline lg:border-t-0" : ""} ${
-              i === 2 ? "lg:border-l" : ""
-            }`}
-          >
-            <p className="text-xs text-muted">{m.label}</p>
-            <p className="font-display num mt-2 text-[44px] leading-none">{m.value}</p>
-            <p className="mt-2 truncate text-xs text-faint">{m.sub}</p>
+      {/* Stat cards */}
+      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {metrics.map(({ label, value, sub, icon: Icon, chip, glow }) => (
+          <div key={label} className="panel stat-card p-5" style={{ ["--glow" as string]: glow }}>
+            <div className="relative flex items-center justify-between">
+              <p className="text-sm text-muted">{label}</p>
+              <span className={`flex h-9 w-9 items-center justify-center rounded-xl ring-1 ${chip}`}>
+                <Icon size={17} />
+              </span>
+            </div>
+            <p className="font-display num relative mt-4 text-4xl leading-none">{value}</p>
+            <p className="relative mt-2 truncate text-xs text-faint">{sub}</p>
           </div>
         ))}
       </section>
@@ -86,7 +116,7 @@ export function DashboardView({
       {/* Sentiment + findings */}
       <section className="panel mt-4 grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
         <div className="p-6">
-          <h2 className="text-sm font-medium">Sentiment</h2>
+          <h2 className="text-[15px] font-semibold">Sentiment</h2>
           <p className="text-xs text-muted">Share of comments by AI label</p>
           <div className="mt-6 flex flex-col items-center gap-8 sm:flex-row lg:flex-col xl:flex-row">
             <SentimentDonut counts={ins.sentiment} size={176} />
@@ -94,7 +124,7 @@ export function DashboardView({
           </div>
         </div>
         <div className="border-t hairline p-6 lg:border-l lg:border-t-0">
-          <h2 className="text-sm font-medium">What stands out</h2>
+          <h2 className="text-[15px] font-semibold">What stands out</h2>
           <p className="text-xs text-muted">Findings calculated directly from your numbers</p>
           {insights.length === 0 ? (
             <p className="mt-6 text-sm text-muted">Not enough data for findings yet.</p>
@@ -128,7 +158,7 @@ export function DashboardView({
       {/* Topics + Ask Talon */}
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
         <section className="panel p-6">
-          <h2 className="text-sm font-medium">Topics</h2>
+          <h2 className="text-[15px] font-semibold">Topics</h2>
           <p className="mb-5 text-xs text-muted">Ranked by how many comments mention them, coloured by sentiment</p>
           <TopicBars topics={ins.topics} max={8} />
         </section>
@@ -140,7 +170,7 @@ export function DashboardView({
               <span className="brand-gradient flex h-8 w-8 items-center justify-center rounded-lg">
                 <Sparkles size={15} className="text-white" />
               </span>
-              <h2 className="font-display text-2xl leading-none">Ask Talon</h2>
+              <h2 className="text-lg font-semibold">Ask Talon</h2>
             </div>
             <p className="mt-3 text-sm text-muted">Answers and content ideas, backed by quotes from your comments.</p>
             <form action="/copilot" method="get" className="mt-5">
@@ -186,7 +216,7 @@ export function DashboardView({
       <section className="panel mt-4 p-6">
         <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h2 className="text-sm font-medium">Comments over time</h2>
+            <h2 className="text-[15px] font-semibold">Comments over time</h2>
             <p className="text-xs text-muted">Daily volume, split by sentiment</p>
           </div>
           <p className="num text-xs text-faint">
@@ -217,7 +247,7 @@ export function DashboardView({
 function Voices({ title, rows, tone }: { title: string; rows: CommentRow[]; tone: "positive" | "negative" }) {
   return (
     <section className="panel p-6">
-      <h2 className="flex items-center gap-2 text-sm font-medium">
+      <h2 className="flex items-center gap-2 text-[15px] font-semibold">
         <span className={`h-2 w-2 rounded-full ${tone === "positive" ? "bg-positive" : "bg-negative"}`} />
         {title}
       </h2>
@@ -227,7 +257,7 @@ function Voices({ title, rows, tone }: { title: string; rows: CommentRow[]; tone
         <ul className="mt-2 divide-y divide-navy-700">
           {rows.map((r) => (
             <li key={r.id} className="py-4 last:pb-0">
-              <blockquote className="font-display text-[19px] leading-snug text-ink">“{r.text}”</blockquote>
+              <blockquote className="text-[15px] leading-relaxed text-ink">“{r.text}”</blockquote>
               <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-faint">
                 {r.author_username && <span>@{r.author_username}</span>}
                 {r.like_count !== null && (
