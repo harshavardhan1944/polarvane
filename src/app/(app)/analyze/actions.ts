@@ -2,6 +2,8 @@
 
 import { refresh } from "next/cache";
 import { parseInstagramUrl } from "@/lib/instagram";
+import { ApifyError, getDatasetItems, getRun, mapApifyItems, startCommentRun } from "@/lib/apify";
+import { COMMENT_LIMITS } from "@/lib/pricing";
 import { createClient } from "@/lib/supabase/server";
 
 export type CreateAnalysisState =
@@ -64,7 +66,7 @@ export async function createAnalysis(
   refresh();
   return {
     status: "created",
-    message: `${parsed.postType === "reel" ? "Reel" : "Post"} saved. Comment collection will be switched on in the next step.`,
+    message: `${parsed.postType === "reel" ? "Reel" : "Post"} saved. Choose how many comments to collect below.`,
   };
 }
 
@@ -80,4 +82,143 @@ export async function deleteAnalysis(formData: FormData) {
   const { error } = await supabase.from("analyses").delete().eq("id", id);
   if (error) console.error("[polarvane] analyses delete failed:", error);
   refresh();
+}
+
+// ---------------- Step 3: comment collection through Apify ----------------
+
+const ALLOWED_LIMITS: readonly number[] = COMMENT_LIMITS;
+const MAX_ACTIVE_JOBS = 3;
+
+export type CollectionResult =
+  | { ok: true; status: string; message?: string }
+  | { ok: false; message: string };
+
+export async function startCollection(id: string, limit: number): Promise<CollectionResult> {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return { ok: false, message: "Invalid request." };
+  if (!ALLOWED_LIMITS.includes(limit)) return { ok: false, message: "Please choose a comment limit." };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "Your session has expired. Please sign in again." };
+
+  const { data: analysis } = await supabase
+    .from("analyses")
+    .select("id, post_url, status")
+    .eq("id", id)
+    .maybeSingle();
+  if (!analysis) return { ok: false, message: "Post not found." };
+  if (!["queued", "failed"].includes(analysis.status))
+    return { ok: false, message: "This post is already being processed." };
+
+  // Protect against accidental runaway costs: limit parallel jobs per user.
+  const { count } = await supabase
+    .from("analyses")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "collecting");
+  if ((count ?? 0) >= MAX_ACTIVE_JOBS)
+    return { ok: false, message: `You can run up to ${MAX_ACTIVE_JOBS} collections at once. Please wait for one to finish.` };
+
+  // Claim the job first so a double-click can't start two paid runs.
+  const { data: claimed } = await supabase
+    .from("analyses")
+    .update({ status: "collecting", comment_limit: limit, error_message: null, apify_run_id: null })
+    .eq("id", id)
+    .in("status", ["queued", "failed"])
+    .select("id");
+  if (!claimed || claimed.length === 0) return { ok: false, message: "This post is already being processed." };
+
+  try {
+    const { runId } = await startCommentRun(analysis.post_url, limit);
+    await supabase.from("analyses").update({ apify_run_id: runId }).eq("id", id);
+    refresh();
+    return { ok: true, status: "collecting" };
+  } catch (err) {
+    const message = err instanceof ApifyError ? err.message : "Couldn’t start collection. Please try again.";
+    console.error("[polarvane] start collection failed:", err);
+    await supabase.from("analyses").update({ status: "failed", error_message: message }).eq("id", id);
+    refresh();
+    return { ok: false, message };
+  }
+}
+
+export async function checkCollection(id: string): Promise<CollectionResult> {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return { ok: false, message: "Invalid request." };
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "Your session has expired. Please sign in again." };
+
+  const { data: analysis } = await supabase
+    .from("analyses")
+    .select("id, status, apify_run_id, comment_limit, updated_at")
+    .eq("id", id)
+    .maybeSingle();
+  if (!analysis) return { ok: false, message: "Post not found." };
+  if (analysis.status !== "collecting") return { ok: true, status: analysis.status };
+
+  const fail = async (message: string) => {
+    await supabase.from("analyses").update({ status: "failed", error_message: message }).eq("id", id);
+    refresh();
+    return { ok: true as const, status: "failed", message };
+  };
+
+  if (!analysis.apify_run_id) {
+    // Run was never registered (e.g. the server stopped mid-start). Give it 2 minutes.
+    const age = Date.now() - new Date(analysis.updated_at).getTime();
+    return age > 120_000 ? fail("Collection didn’t start properly. Please try again.") : { ok: true, status: "collecting" };
+  }
+
+  try {
+    const run = await getRun(analysis.apify_run_id);
+    if (run.status === "READY" || run.status === "RUNNING") return { ok: true, status: "collecting" };
+    if (run.status !== "SUCCEEDED") {
+      const why = run.status === "TIMED-OUT" || run.status === "TIMING-OUT" ? "timed out" : run.status.toLowerCase();
+      return fail(`Apify collection ${why}.${run.statusMessage ? ` ${run.statusMessage}` : ""}`);
+    }
+
+    const items = await getDatasetItems(run.datasetId, analysis.comment_limit);
+    const { comments, errors } = mapApifyItems(items);
+
+    if (comments.length === 0) {
+      return fail(
+        errors[0]
+          ? `No comments collected: ${errors[0]}`
+          : "No comments were found. The post may be private, have comments turned off, or have no comments yet.",
+      );
+    }
+
+    // Save in batches. Duplicates (same comment twice) are ignored safely.
+    for (let i = 0; i < comments.length; i += 500) {
+      const batch = comments.slice(i, i + 500).map((c) => ({ ...c, analysis_id: id, user_id: user.id }));
+      const { error } = await supabase
+        .from("comments")
+        .upsert(batch, { onConflict: "analysis_id,external_id", ignoreDuplicates: true });
+      if (error) {
+        console.error("[polarvane] saving comments failed:", error);
+        return fail("Comments were collected but couldn’t be saved. Please try again.");
+      }
+    }
+
+    const { count } = await supabase
+      .from("comments")
+      .select("id", { count: "exact", head: true })
+      .eq("analysis_id", id);
+
+    await supabase
+      .from("analyses")
+      .update({ status: "analyzing", comments_collected: count ?? comments.length, error_message: null })
+      .eq("id", id);
+    refresh();
+    return { ok: true, status: "analyzing" };
+  } catch (err) {
+    if (err instanceof ApifyError && (err.kind === "rate_limit" || err.kind === "other")) {
+      // Temporary problem: keep waiting, the next check will retry.
+      return { ok: true, status: "collecting", message: err.message };
+    }
+    console.error("[polarvane] check collection failed:", err);
+    return fail(err instanceof ApifyError ? err.message : "Something went wrong while collecting comments.");
+  }
 }
