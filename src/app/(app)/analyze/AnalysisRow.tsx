@@ -194,7 +194,7 @@ export function AnalysisRow({ row }: { row: AnalysisRowData }) {
         </div>
       )}
 
-      {message && (
+      {message && message !== row.error_message && (
         <p className="mt-3 flex items-start gap-2 text-xs text-amber-200">
           <AlertCircle size={13} className="mt-0.5 shrink-0" /> {message}
         </p>

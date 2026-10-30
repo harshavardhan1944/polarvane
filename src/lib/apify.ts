@@ -47,17 +47,25 @@ async function apifyFetch(path: string, init?: RequestInit) {
 
   const body = await res.text().catch(() => "");
   console.error(`[polarvane] Apify ${res.status} on ${path}:`, body.slice(0, 500));
-  if (res.status === 401 || res.status === 403)
-    throw new ApifyError("Apify rejected the API token. Check APIFY_TOKEN in Vercel.", "auth");
+  // Apify's own explanation (never contains the token itself).
+  let detail = "";
+  try {
+    const e = JSON.parse(body)?.error;
+    if (e?.message) detail = ` Apify says: “${String(e.message).slice(0, 300)}” (${e.type ?? res.status})`;
+  } catch {}
+  if (res.status === 401)
+    throw new ApifyError(`Apify didn’t recognise the API token. Check APIFY_TOKEN in Vercel.${detail}`, "auth");
+  if (res.status === 403)
+    throw new ApifyError(`Apify refused this request.${detail}`, "auth");
   if (res.status === 402 || /insufficient|credit|usage limit|exceed/i.test(body))
     throw new ApifyError(
-      "Your Apify account is out of credit or hit its monthly limit. Check billing in Apify.",
+      `Your Apify account is out of credit or hit its monthly limit. Check billing in Apify.${detail}`,
       "credit",
     );
   if (res.status === 429)
     throw new ApifyError("Apify is busy (rate limit). Please wait a minute and try again.", "rate_limit");
   if (res.status === 404) throw new ApifyError("Apify couldn’t find that job.", "not_found");
-  throw new ApifyError(`Apify returned an error (${res.status}). Please try again.`, "other");
+  throw new ApifyError(`Apify returned an error (${res.status}).${detail}`, "other");
 }
 
 export async function startCommentRun(postUrl: string, limit: number) {
