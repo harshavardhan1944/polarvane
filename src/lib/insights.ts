@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // Every figure is computed from real rows — nothing is estimated or invented.
 
 import type { CommentRow } from "./insights-types";
+import { maskMentions } from "./privacy";
 export * from "./insights-core";
 
 const PAGE = 1000;
@@ -22,7 +23,10 @@ export async function loadComments(supabase: SupabaseClient, analysisId?: string
     if (analysisId) q = q.eq("analysis_id", analysisId);
     const { data, error } = await q;
     if (error) throw error;
-    rows.push(...((data ?? []) as CommentRow[]));
+    // Privacy: usernames are never passed on, and @mentions are hidden.
+    rows.push(
+      ...((data ?? []) as CommentRow[]).map((r) => ({ ...r, author_username: null, text: maskMentions(r.text) })),
+    );
     if (!data || data.length < PAGE) break;
   }
   return { rows, truncated: rows.length >= MAX_ROWS };

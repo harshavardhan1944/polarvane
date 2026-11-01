@@ -199,7 +199,6 @@ export function TalonChat({
                             >
                               <p className="text-sm leading-relaxed text-ink">“{e.text}”</p>
                               <p className="mt-1.5 flex flex-wrap items-center gap-x-2.5 text-[11px] text-faint">
-                                {e.author_username && <span>@{e.author_username}</span>}
                                 {e.sentiment && <span className="capitalize">{e.sentiment}</span>}
                                 {e.like_count !== null && (
                                   <span className="inline-flex items-center gap-1">

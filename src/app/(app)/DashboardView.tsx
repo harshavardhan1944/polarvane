@@ -259,7 +259,6 @@ function Voices({ title, rows, tone }: { title: string; rows: CommentRow[]; tone
             <li key={r.id} className="py-4 last:pb-0">
               <blockquote className="text-[15px] leading-relaxed text-ink">“{r.text}”</blockquote>
               <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-faint">
-                {r.author_username && <span>@{r.author_username}</span>}
                 {r.like_count !== null && (
                   <span className="num inline-flex items-center gap-1">
                     <Heart size={11} /> {r.like_count.toLocaleString()}

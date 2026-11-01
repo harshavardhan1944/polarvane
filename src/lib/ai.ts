@@ -1,4 +1,5 @@
 import "server-only";
+import { maskMentions } from "./privacy";
 
 // Classifies comments with Google Gemini (free tier). Runs ONLY on the server;
 // GEMINI_API_KEY never reaches the browser.
@@ -198,7 +199,7 @@ export async function geminiJson(req: GeminiRequest): Promise<unknown> {
 }
 
 async function classifyOnce(comments: CommentInput[]): Promise<CommentResult[]> {
-  const payload = comments.map((c) => ({ id: c.id, text: c.text.slice(0, 1500) }));
+  const payload = comments.map((c) => ({ id: c.id, text: maskMentions(c.text).slice(0, 1500) }));
   const parsed = (await geminiJson({
     system: INSTRUCTIONS,
     user: `Label these ${payload.length} Instagram comments (JSON):\n${JSON.stringify(payload)}`,
