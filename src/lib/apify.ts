@@ -159,16 +159,21 @@ export function mapApifyItems(rawItems: Record<string, unknown>[]) {
   const errors: string[] = [];
   const seen = new Set<string>();
 
-  // Replies may arrive nested inside their parent comment; treat each as its own comment.
+  // Replies may arrive nested inside their parent comment under various field
+  // names. Find any list of comment-like objects (with text) at any depth and
+  // treat each as its own comment.
   const items: Record<string, unknown>[] = [];
-  for (const it of rawItems) {
+  const looksLikeComment = (o: unknown): o is Record<string, unknown> =>
+    Boolean(o && typeof o === "object" && !Array.isArray(o) && (typeof (o as Record<string, unknown>).text === "string" ||
+      typeof (o as Record<string, unknown>).commentText === "string"));
+  const walk = (it: Record<string, unknown>, depth: number) => {
     items.push(it);
-    for (const key of ["replies", "childComments", "nestedComments"]) {
-      const nested = it[key];
-      if (Array.isArray(nested))
-        for (const r of nested) if (r && typeof r === "object") items.push(r as Record<string, unknown>);
+    if (depth > 3) return;
+    for (const value of Object.values(it)) {
+      if (Array.isArray(value)) for (const v of value) if (looksLikeComment(v)) walk(v, depth + 1);
     }
-  }
+  };
+  for (const it of rawItems) if (it && typeof it === "object") walk(it, 0);
 
   for (const item of items) {
     if (item.error || item.errorDescription) {

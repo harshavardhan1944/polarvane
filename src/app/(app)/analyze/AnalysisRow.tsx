@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { COMMENT_LIMITS, estimateApifyCost, isAllOption, limitLabel } from "@/lib/pricing";
 import { SentimentBar, SentimentLegend } from "@/components/charts";
-import { analyzeNextBatch, checkCollection, deleteAnalysis, fetchDetails, startCollection } from "./actions";
+import { analyzeNextBatch, checkCollection, deleteAnalysis, fetchDetails, rereadLastRun, startCollection } from "./actions";
 
 export type AnalysisRowData = {
   id: string;
@@ -320,6 +320,20 @@ export function AnalysisRow({ row }: { row: AnalysisRowData }) {
             className="inline-flex items-center gap-1.5 text-xs text-brand-blue hover:underline"
           >
             <RotateCcw size={13} /> {recollect ? "Cancel collect more" : "Collect more (e.g. add replies)"}
+          </button>
+          <button
+            onClick={() =>
+              startTransition(async () => {
+                const r = await rereadLastRun(row.id);
+                if (!r.ok) setMessage(r.message);
+                router.refresh();
+              })
+            }
+            disabled={pending}
+            title="Re-reads the results Apify already collected. No new Apify charge."
+            className="inline-flex items-center gap-1.5 text-xs text-brand-blue hover:underline disabled:opacity-50"
+          >
+            <Download size={13} /> Re-read last collection (free)
           </button>
         </div>
       )}

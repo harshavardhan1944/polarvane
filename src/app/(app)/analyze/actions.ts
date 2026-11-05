@@ -368,3 +368,24 @@ export async function fetchDetails(id: string): Promise<DetailsResult> {
     return { ok: false, message: err instanceof ApifyError ? err.message : "Couldn’t fetch post details." };
   }
 }
+
+// Re-read the results of the most recent Apify run (no new collection, no new Apify charge).
+// Already-saved comments are skipped; only newly recognised ones are added and analyzed.
+export async function rereadLastRun(id: string): Promise<CollectionResult> {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return { ok: false, message: "Invalid request." };
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "Your session has expired. Please sign in again." };
+  const { data: claimed } = await supabase
+    .from("analyses")
+    .update({ status: "collecting", error_message: null })
+    .eq("id", id)
+    .not("apify_run_id", "is", null)
+    .in("status", ["completed", "failed"])
+    .select("id");
+  if (!claimed || claimed.length === 0) return { ok: false, message: "There’s no previous collection to re-read." };
+  refresh();
+  return { ok: true, status: "collecting" };
+}
