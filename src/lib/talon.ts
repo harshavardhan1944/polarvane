@@ -109,6 +109,9 @@ export async function askTalon(
     `Scope: ${scopeLabel}`,
     `Comments analyzed: ${ins.total}`,
     `Sentiment: positive ${ins.sentiment.positive} (${pct(ins.sentiment.positive)}), neutral ${ins.sentiment.neutral} (${pct(ins.sentiment.neutral)}), negative ${ins.sentiment.negative} (${pct(ins.sentiment.negative)})`,
+    ins.focusTotal
+      ? `Who comments are about (of ${ins.focusTotal} labelled): product/brand ${ins.focus.product}, creator ${ins.focus.creator}, both ${ins.focus.both}, other ${ins.focus.other}`
+      : "Comment focus (product vs creator) not labelled yet.",
     `Topics (comments | positive/neutral/negative): ${
       ins.topics
         .slice(0, 25)

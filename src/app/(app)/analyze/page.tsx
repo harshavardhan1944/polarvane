@@ -9,6 +9,7 @@ export const maxDuration = 300;
 
 const BASE_COLS = "id, post_url, shortcode, post_type, status, error_message, comments_collected, comment_limit, created_at";
 const DETAIL_COLS = "caption, post_owner, likes_count, views_count, comments_reported, post_published_at, details_status";
+const KIND_COL = "post_kind";
 
 export default async function AnalyzePage() {
   const supabase = await createClient();
@@ -17,12 +18,17 @@ export default async function AnalyzePage() {
   const query = (cols: string) =>
     supabase.from("analyses").select(cols).order("created_at", { ascending: false }).limit(50);
   type Result = { data: Record<string, unknown>[] | null; error: { message: string } | null };
-  let { data, error } = (await query(`${BASE_COLS}, ${DETAIL_COLS}`)) as unknown as Result;
+  let hasKinds = true;
+  let { data, error } = (await query(`${BASE_COLS}, ${DETAIL_COLS}, ${KIND_COL}`)) as unknown as Result;
+  if (error && /column|schema cache/i.test(error.message)) {
+    hasKinds = false;
+    ({ data, error } = (await query(`${BASE_COLS}, ${DETAIL_COLS}`)) as unknown as Result);
+  }
   if (error && /column|schema cache/i.test(error.message)) {
     hasDetails = false;
     ({ data, error } = (await query(BASE_COLS)) as unknown as Result);
   }
-  const base = (data ?? []) as unknown as Omit<AnalysisRowData, "created_label" | "summary" | "has_details">[];
+  const base = (data ?? []) as unknown as Omit<AnalysisRowData, "created_label" | "summary" | "has_details" | "has_kinds">[];
 
   // Real counts straight from the database for each finished analysis.
   const summaries = new Map<string, AnalysisRowData["summary"]>();
@@ -50,6 +56,7 @@ export default async function AnalyzePage() {
     ...r,
     summary: summaries.get(r.id) ?? null,
     has_details: hasDetails,
+    has_kinds: hasKinds,
     created_label: new Date(r.created_at).toLocaleString("en-IN", {
       dateStyle: "medium",
       timeStyle: "short",

@@ -10,4 +10,5 @@ export type CommentRow = {
   sentiment: Sentiment | null;
   sentiment_confidence: number | null;
   topics: string[];
+  focus?: "product" | "creator" | "both" | "other" | null;
 };

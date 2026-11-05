@@ -48,10 +48,12 @@ export class AiError extends Error {
 }
 
 export type CommentInput = { id: string; text: string };
+export type Focus = "product" | "creator" | "both" | "other";
 export type CommentResult = {
   id: string;
   sentiment: "positive" | "neutral" | "negative";
   confidence: number | null;
+  focus: Focus | null;
   topics: string[];
 };
 
@@ -80,7 +82,13 @@ For EACH comment, decide:
    - "negative": criticism, insults, complaints, disappointment, mockery, hostility.
    - "neutral": questions, tagging friends, factual remarks, spam, unclear or mixed with no clear lean.
 2. confidence: a number from 0 to 1 for how sure you are of the sentiment.
-3. topics: 0–3 short lowercase themes that the comment ACTUALLY talks about.
+3. focus: who or what the comment is about:
+   - "product": the brand, its products, or results (e.g. hair, shampoo, colour, price, where to buy).
+   - "creator": the person in the post (their looks, personality, fan love, "queen", "beautiful").
+   - "both": clearly mentions both the product/brand and the person.
+   - "other": tags of friends, spam, unrelated, or unclear (including lone emoji).
+   Use the post caption (if given) to know which brand/products are being promoted.
+4. topics: 0–3 short lowercase themes that the comment ACTUALLY talks about.
    Prefer these when they fit: ${CORE_TOPICS.join(", ")}.
    If a clearly different theme appears, you may use a new short theme (1–3 words, lowercase).
    If a comment names a specific product or product line (e.g. a range name), include that name as a topic.
@@ -103,9 +111,10 @@ const RESPONSE_SCHEMA = {
           id: { type: "STRING" },
           sentiment: { type: "STRING", enum: ["positive", "neutral", "negative"] },
           confidence: { type: "NUMBER" },
+          focus: { type: "STRING", enum: ["product", "creator", "both", "other"] },
           topics: { type: "ARRAY", items: { type: "STRING" } },
         },
-        required: ["id", "sentiment", "confidence", "topics"],
+        required: ["id", "sentiment", "confidence", "focus", "topics"],
       },
     },
   },
@@ -239,10 +248,12 @@ async function classifyOnce(comments: CommentInput[], context?: string): Promise
       ? [...new Set(r.topics.map((t) => normaliseTopic(String(t))).filter(Boolean))].slice(0, 3)
       : [];
     const conf = Number(r.confidence);
+    const focus = ["product", "creator", "both", "other"].includes(r.focus as string) ? (r.focus as Focus) : null;
     out.push({
       id,
       sentiment,
       confidence: Number.isFinite(conf) ? Math.min(1, Math.max(0, conf)) : null,
+      focus,
       topics,
     });
   }

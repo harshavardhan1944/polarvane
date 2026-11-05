@@ -43,8 +43,23 @@ export function computeInsights(rows: CommentRow[]) {
       )
       .slice(0, 4);
 
+  // Who/what comments are about (only for comments that have a focus label).
+  const focus = { product: 0, creator: 0, both: 0, other: 0 };
+  const focusExamples: Record<string, CommentRow[]> = { product: [], creator: [], both: [], other: [] };
+  for (const r of rows) {
+    if (!r.sentiment || !r.focus) continue;
+    focus[r.focus]++;
+    focusExamples[r.focus].push(r);
+  }
+  const byLikes = (a: CommentRow, b: CommentRow) => (b.like_count ?? 0) - (a.like_count ?? 0);
+  for (const k of Object.keys(focusExamples)) focusExamples[k] = focusExamples[k].sort(byLikes).slice(0, 3);
+  const focusTotal = focus.product + focus.creator + focus.both + focus.other;
+
   return {
     total,
+    focus,
+    focusTotal,
+    focusExamples,
     sentiment,
     topics: topicList,
     days: dayList,

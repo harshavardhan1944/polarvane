@@ -294,12 +294,12 @@ export async function analyzeNextBatch(id: string): Promise<AnalyzeResult> {
 
     const returned = new Set(results.map((r) => r.id));
     await Promise.all([
-      ...results.map((r) =>
-        supabase
-          .from("comments")
-          .update({ sentiment: r.sentiment, sentiment_confidence: r.confidence, topics: r.topics })
-          .eq("id", r.id),
-      ),
+      ...results.map(async (r) => {
+        const base = { sentiment: r.sentiment, sentiment_confidence: r.confidence, topics: r.topics };
+        const { error: e1 } = await supabase.from("comments").update({ ...base, focus: r.focus }).eq("id", r.id);
+        // If the "focus" column isn't added yet, still save the rest.
+        if (e1) await supabase.from("comments").update(base).eq("id", r.id);
+      }),
       // Never guess: comments the AI skipped are marked, not given a made-up label.
       ...batch
         .filter((c) => !returned.has(c.id))
@@ -388,4 +388,45 @@ export async function rereadLastRun(id: string): Promise<CollectionResult> {
   if (!claimed || claimed.length === 0) return { ok: false, message: "There’s no previous collection to re-read." };
   refresh();
   return { ok: true, status: "collecting" };
+}
+
+
+// ---------------- Post type + re-analysis ----------------
+
+export async function setPostKind(id: string, kind: string): Promise<{ ok: boolean; message?: string }> {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return { ok: false, message: "Invalid request." };
+  const value = ["collaboration", "brand", "other"].includes(kind) ? kind : null;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "Your session has expired. Please sign in again." };
+  const { error } = await supabase.from("analyses").update({ post_kind: value }).eq("id", id);
+  if (error) return { ok: false, message: "Post types need the database update (part 4) in Supabase." };
+  refresh();
+  return { ok: true };
+}
+
+// Clears AI labels for a post so they're recomputed (e.g. to add the new "focus" label).
+// Collected comments are kept; only Gemini runs again.
+export async function reanalyze(id: string): Promise<CollectionResult> {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return { ok: false, message: "Invalid request." };
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "Your session has expired. Please sign in again." };
+  const { data: claimed } = await supabase
+    .from("analyses")
+    .update({ status: "analyzing", comments_analyzed: 0 })
+    .eq("id", id)
+    .eq("status", "completed")
+    .select("id");
+  if (!claimed || claimed.length === 0) return { ok: false, message: "Only completed posts can be re-analyzed." };
+  await supabase
+    .from("comments")
+    .update({ sentiment: null, sentiment_confidence: null, topics: [], analysis_error: null })
+    .eq("analysis_id", id);
+  refresh();
+  return { ok: true, status: "analyzing" };
 }

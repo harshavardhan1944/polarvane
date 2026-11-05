@@ -231,3 +231,43 @@ export function SentimentRows({ counts }: { counts: Counts }) {
     </div>
   );
 }
+
+const FOCUS = [
+  { key: "product", label: "Product / brand", hex: "#5b8cff" },
+  { key: "creator", label: "Creator", hex: "#d55181" },
+  { key: "both", label: "Both", hex: "#9c7cff" },
+  { key: "other", label: "Other", hex: "#6b7a99" },
+] as const;
+
+type FocusCounts = { product: number; creator: number; both: number; other: number };
+
+export function FocusBar({ counts }: { counts: FocusCounts }) {
+  const total = counts.product + counts.creator + counts.both + counts.other;
+  return (
+    <div>
+      <div className="flex h-3.5 w-full gap-[2px]">
+        {FOCUS.filter((f) => counts[f.key] > 0).map((f) => (
+          <div
+            key={f.key}
+            className="group relative h-full rounded-[4px]"
+            style={{ width: `${(counts[f.key] / total) * 100}%`, background: f.hex }}
+          >
+            <Tip>
+              {f.label}: {counts[f.key]} ({pct(counts[f.key], total)}%)
+            </Tip>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-xs">
+        {FOCUS.map((f) => (
+          <span key={f.key} className="inline-flex items-center gap-1.5 text-ink">
+            <span className="h-2.5 w-2.5 rounded-full" style={{ background: f.hex }} />
+            {f.label}
+            <span className="num font-medium">{pct(counts[f.key], total)}%</span>
+            <span className="num text-faint">({counts[f.key]})</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}

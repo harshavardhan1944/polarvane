@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Activity, ArrowRight, ArrowUpRight, Heart, MessageSquareText, Smile, Sparkles, Tags } from "lucide-react";
 import { PostFilter } from "@/components/PostFilter";
-import { SentimentDonut, SentimentRows, TopicBars, TrendColumns } from "@/components/charts";
+import { FocusBar, SentimentDonut, SentimentRows, TopicBars, TrendColumns } from "@/components/charts";
 import type { CommentRow, KeyInsight, computeInsights } from "@/lib/insights-core";
 
 type Insights = ReturnType<typeof computeInsights>;
@@ -15,6 +15,8 @@ function moodOf(net: number) {
 }
 
 export function DashboardView({
+  kind = "",
+  kindCounts = null,
   posts,
   selected,
   ins,
@@ -22,6 +24,8 @@ export function DashboardView({
   postCount,
   notice,
 }: {
+  kind?: string;
+  kindCounts?: { all: number; collaboration: number; brand: number } | null;
   posts: { id: string; label: string }[];
   selected: string;
   ins: Insights;
@@ -71,6 +75,29 @@ export function DashboardView({
 
   return (
     <>
+      {kindCounts && (
+        <nav className="mb-6 flex flex-wrap gap-1.5" aria-label="Dashboard type">
+          {[
+            { k: "", label: "All posts", n: kindCounts.all },
+            { k: "collaboration", label: "Creator collaborations", n: kindCounts.collaboration },
+            { k: "brand", label: "Brand posts", n: kindCounts.brand },
+          ].map((t) => (
+            <Link
+              key={t.k || "all"}
+              href={t.k ? `/?kind=${t.k}` : "/"}
+              aria-current={kind === t.k ? "page" : undefined}
+              className={`rounded-full border px-3.5 py-1.5 text-sm transition-colors ${
+                kind === t.k
+                  ? "border-brand-blue/60 bg-brand-blue/15 text-ink"
+                  : "border-navy-600 bg-navy-900/50 text-muted hover:text-ink"
+              }`}
+            >
+              {t.label} <span className="num text-faint">{t.n}</span>
+            </Link>
+          ))}
+        </nav>
+      )}
+
       {/* Readout: the audience in one sentence, built from real numbers */}
       <header className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-3xl">
@@ -93,7 +120,7 @@ export function DashboardView({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <PostFilter posts={posts} value={selected} />
+          <PostFilter posts={posts} value={selected} kind={kind} />
           <a
             href={`/api/export${selected ? `?analysis=${selected}` : ""}`}
             className="rounded-lg border border-navy-600 bg-navy-900/60 px-3 py-2 text-sm text-muted hover:text-ink"
@@ -120,6 +147,70 @@ export function DashboardView({
           </div>
         ))}
       </section>
+
+      {kind && posts.length === 0 && (
+        <div className="panel mt-4 p-6 text-sm text-muted">
+          No posts are marked as {kind === "collaboration" ? "creator collaborations" : "brand posts"} yet. On{" "}
+          <Link href="/analyze" className="text-brand-blue hover:underline">
+            Analyze a post
+          </Link>
+          , set each post’s type.
+        </div>
+      )}
+
+      {/* Who are people talking about? */}
+      {ins.total > 0 && (
+        <section className={`panel mt-4 p-6 ${kind === "collaboration" ? "ring-1 ring-brand-violet/40" : ""}`}>
+          <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-[15px] font-semibold">Who are people talking about?</h2>
+              <p className="text-xs text-muted">
+                {kind === "collaboration"
+                  ? "The key question for a collaboration: did the audience notice the product, or only the creator?"
+                  : "Whether comments are about the product and brand, the person in the post, or something else"}
+              </p>
+            </div>
+            {ins.focusTotal > 0 && (
+              <p className="num text-sm text-ink">
+                {Math.round(((ins.focus.product + ins.focus.both) / ins.focusTotal) * 100)}% mention the product or brand
+              </p>
+            )}
+          </div>
+          {ins.focusTotal > 0 ? (
+            <>
+              <FocusBar counts={ins.focus} />
+              <div className="mt-5 grid gap-3 md:grid-cols-3">
+                {(["product", "creator", "both"] as const).map((f) => (
+                  <div key={f} className="rounded-xl border border-navy-700 bg-navy-900/50 p-3">
+                    <p className="text-xs text-muted">
+                      {f === "product" ? "About the product / brand" : f === "creator" ? "About the creator" : "About both"}
+                    </p>
+                    {ins.focusExamples[f].length === 0 ? (
+                      <p className="mt-2 text-xs text-faint">No comments.</p>
+                    ) : (
+                      <ul className="mt-2 space-y-2">
+                        {ins.focusExamples[f].map((r) => (
+                          <li key={r.id} className="text-sm leading-snug text-ink">
+                            “{r.text}”
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="rounded-xl border border-dashed border-navy-600 p-6 text-center text-sm text-muted">
+              These comments were analyzed before this feature existed. On{" "}
+              <Link href="/analyze" className="text-brand-blue hover:underline">
+                Analyze a post
+              </Link>
+              , click “Re-analyze with AI” on a post to add it (no Apify cost).
+            </p>
+          )}
+        </section>
+      )}
 
       {/* Sentiment + findings */}
       <section className="panel mt-4 grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">

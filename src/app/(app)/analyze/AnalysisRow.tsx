@@ -10,11 +10,21 @@ import {
   ImageIcon,
   Loader2,
   RotateCcw,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import { COMMENT_LIMITS, estimateApifyCost, isAllOption, limitLabel } from "@/lib/pricing";
 import { SentimentBar, SentimentLegend } from "@/components/charts";
-import { analyzeNextBatch, checkCollection, deleteAnalysis, fetchDetails, rereadLastRun, startCollection } from "./actions";
+import {
+  analyzeNextBatch,
+  checkCollection,
+  deleteAnalysis,
+  fetchDetails,
+  reanalyze,
+  rereadLastRun,
+  setPostKind,
+  startCollection,
+} from "./actions";
 
 export type AnalysisRowData = {
   id: string;
@@ -29,6 +39,8 @@ export type AnalysisRowData = {
   created_label: string;
   summary: { positive: number; neutral: number; negative: number; failed: number } | null;
   has_details: boolean;
+  has_kinds: boolean;
+  post_kind?: string | null;
   caption?: string | null;
   post_owner?: string | null;
   likes_count?: number | null;
@@ -186,6 +198,25 @@ export function AnalysisRow({ row }: { row: AnalysisRowData }) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {row.has_kinds && (
+            <select
+              aria-label="Post type"
+              value={row.post_kind ?? ""}
+              onChange={(e) =>
+                startTransition(async () => {
+                  const r = await setPostKind(row.id, e.target.value);
+                  if (!r.ok && r.message) setMessage(r.message);
+                  router.refresh();
+                })
+              }
+              className="rounded-full border border-navy-600 bg-navy-900 px-2.5 py-1 text-xs text-ink outline-none focus:border-brand-blue"
+            >
+              <option value="">Set post type…</option>
+              <option value="collaboration">Creator collaboration</option>
+              <option value="brand">Brand post</option>
+              <option value="other">Other</option>
+            </select>
+          )}
           <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${badge.cls}`}>
             {(row.status === "collecting" || (row.status === "analyzing" && !aiError)) && (
               <Loader2 size={12} className="animate-spin" />
@@ -334,6 +365,20 @@ export function AnalysisRow({ row }: { row: AnalysisRowData }) {
             className="inline-flex items-center gap-1.5 text-xs text-brand-blue hover:underline disabled:opacity-50"
           >
             <Download size={13} /> Re-read last collection (free)
+          </button>
+          <button
+            onClick={() =>
+              startTransition(async () => {
+                const r = await reanalyze(row.id);
+                if (!r.ok) setMessage(r.message);
+                router.refresh();
+              })
+            }
+            disabled={pending}
+            title="Runs the AI again on the comments you already have (adds 'who is it about'). No Apify cost."
+            className="inline-flex items-center gap-1.5 text-xs text-brand-blue hover:underline disabled:opacity-50"
+          >
+            <Sparkles size={13} /> Re-analyze with AI
           </button>
         </div>
       )}
