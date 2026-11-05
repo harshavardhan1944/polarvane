@@ -2,6 +2,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/NotBuiltYet";
 import { computeInsights, loadComments } from "@/lib/insights";
 import { createClient } from "@/lib/supabase/server";
+import { listChats } from "./actions";
 import { TalonChat, type TalonSummary } from "./TalonChat";
 
 export const instant = false;
@@ -47,13 +48,14 @@ export default async function CopilotPage(props: PageProps<"/copilot">) {
     console.error("[polarvane] copilot summary failed:", e);
   }
 
+  const chats = await listChats().catch(() => []);
   const q = typeof sp.q === "string" ? sp.q.slice(0, 1000) : "";
   const post = typeof sp.post === "string" && posts.some((p) => p.id === sp.post) ? sp.post : "";
 
   return (
     <>
       <h1 className="sr-only">Talon copilot</h1>
-      <TalonChat key={`${q}|${post}`} posts={posts} summary={summary} initialQuestion={q} initialPost={post} />
+      <TalonChat key={`${q}|${post}`} posts={posts} summary={summary} initialQuestion={q} initialPost={post} initialChats={chats} />
     </>
   );
 }

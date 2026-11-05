@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { AlertCircle, ArrowUp, Check, Copy, Heart, MessageSquarePlus, ShieldCheck, Sparkles } from "lucide-react";
+import { AlertCircle, ArrowUp, Check, Copy, Heart, History, MessageSquarePlus, ShieldCheck, Sparkles, Trash2 } from "lucide-react";
 import { SentimentBar } from "@/components/charts";
-import type { ChatTurn, TalonEvidence } from "@/lib/talon";
-import { sendToTalon } from "./actions";
+import type { TalonEvidence } from "@/lib/talon";
+import { deleteChat, listChats, loadChat, sendToTalon, type ChatSummary } from "./actions";
 
 export type TalonSummary = {
   total: number;
@@ -41,13 +41,19 @@ export function TalonChat({
   initialQuestion = "",
   initialPost = "",
   initialMessages = [],
+  initialChats = [],
 }: {
   posts: { id: string; label: string }[];
   summary: TalonSummary;
   initialQuestion?: string;
   initialPost?: string;
   initialMessages?: Message[];
+  initialChats?: ChatSummary[];
 }) {
+  const [chatId, setChatId] = useState<string | null>(null);
+  const [chats, setChats] = useState<ChatSummary[]>(initialChats);
+  const [historyWarning, setHistoryWarning] = useState<string | null>(null);
+  const [loadingChat, setLoadingChat] = useState(false);
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
   const [postId, setPostId] = useState(initialPost);
@@ -71,24 +77,51 @@ export function TalonChat({
   function ask(question: string) {
     const q = question.trim();
     if (!q || pending) return;
-    const history: ChatTurn[] = messages
-      .filter((m): m is Exclude<Message, { role: "error" }> => m.role !== "error")
-      .map((m) => ({ role: m.role, text: m.text }));
     setMessages((m) => [...m, { role: "user", text: q }]);
     setInput("");
     startTransition(async () => {
       try {
-        const r = await sendToTalon(q, history, postId);
+        const r = await sendToTalon(q, chatId, postId);
+        if (r.chatId) setChatId(r.chatId);
+        setHistoryWarning(r.historyWarning ?? null);
         setMessages((m) => [
           ...m,
           r.ok
             ? { role: "talon", text: r.answer, evidence: r.evidence, total: r.total, sampled: r.sampled }
             : { role: "error", text: r.message, question: q },
         ]);
+        listChats().then(setChats).catch(() => {});
       } catch {
         setMessages((m) => [...m, { role: "error", text: "Lost connection. Please try again.", question: q }]);
       }
     });
+  }
+
+  function newChat() {
+    setMessages([]);
+    setChatId(null);
+    setHistoryWarning(null);
+  }
+
+  async function openChat(id: string) {
+    if (pending || loadingChat) return;
+    setLoadingChat(true);
+    try {
+      const c = await loadChat(id);
+      if (c) {
+        setMessages(c.messages as Message[]);
+        setChatId(id);
+        setPostId(posts.some((p) => p.id === c.postId) ? c.postId : "");
+      }
+    } finally {
+      setLoadingChat(false);
+    }
+  }
+
+  async function removeChat(id: string) {
+    await deleteChat(id);
+    if (id === chatId) newChat();
+    setChats((cs) => cs.filter((c) => c.id !== id));
   }
 
   const allSuggestions = SUGGESTION_GROUPS.flatMap((g) => g.items);
@@ -123,7 +156,7 @@ export function TalonChat({
           </select>
           {messages.length > 0 && (
             <button
-              onClick={() => setMessages([])}
+              onClick={newChat}
               disabled={pending}
               title="New chat"
               className="inline-flex items-center gap-1.5 rounded-lg border border-navy-700 px-2.5 py-1.5 text-xs text-muted hover:text-ink disabled:opacity-40"
@@ -133,6 +166,9 @@ export function TalonChat({
           )}
         </div>
 
+        {historyWarning && (
+          <p className="border-b border-amber-400/20 bg-amber-400/10 px-4 py-2 text-xs text-amber-200">{historyWarning}</p>
+        )}
         <div className="flex-1 space-y-6 overflow-y-auto px-4 py-6 sm:px-6">
           {messages.length === 0 && !pending && (
             <div className="flex h-full flex-col items-center justify-center text-center">
@@ -297,6 +333,40 @@ export function TalonChat({
 
       {/* Side panel */}
       <aside className="space-y-4">
+        <div className="panel p-4">
+          <p className="flex items-center gap-1.5 text-xs text-muted">
+            <History size={13} /> Saved chats
+          </p>
+          {chats.length === 0 ? (
+            <p className="mt-2 text-xs text-faint">Your conversations will be saved here.</p>
+          ) : (
+            <ul className="mt-2 max-h-64 space-y-0.5 overflow-y-auto">
+              {chats.map((c) => (
+                <li key={c.id} className="group flex items-center gap-1">
+                  <button
+                    onClick={() => openChat(c.id)}
+                    disabled={pending || loadingChat}
+                    className={`min-w-0 flex-1 truncate rounded-md px-2 py-1.5 text-left text-xs transition-colors ${
+                      c.id === chatId ? "bg-navy-800 text-ink" : "text-muted hover:bg-navy-850 hover:text-ink"
+                    }`}
+                    title={c.title}
+                  >
+                    {c.title}
+                  </button>
+                  <button
+                    onClick={() => removeChat(c.id)}
+                    disabled={pending}
+                    aria-label="Delete chat"
+                    title="Delete chat"
+                    className="rounded p-1 text-faint opacity-0 hover:text-red-300 focus:opacity-100 group-hover:opacity-100"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
         <div className="panel p-4">
           <p className="text-xs text-muted">What Talon knows</p>
           <p className="font-display num mt-2 text-3xl leading-none">{summary.total.toLocaleString()}</p>
