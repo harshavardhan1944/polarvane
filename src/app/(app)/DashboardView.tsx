@@ -247,6 +247,7 @@ export function DashboardView({
             <p className="mt-3 text-sm text-muted">Answers and content ideas, backed by quotes from your comments.</p>
             <form action="/copilot" method="get" className="mt-5">
               <input type="hidden" name="post" value={selected} />
+              <input type="hidden" name="d" value={dashboardId} />
               <label htmlFor="ask-talon" className="sr-only">
                 Question for Talon
               </label>
@@ -272,7 +273,9 @@ export function DashboardView({
               ].map((q) => (
                 <Link
                   key={q}
-                  href={`/copilot?q=${encodeURIComponent(q)}${selected ? `&post=${selected}` : ""}`}
+                  href={`/copilot?q=${encodeURIComponent(q)}${selected ? `&post=${selected}` : ""}${
+                    dashboardId ? `&d=${dashboardId}` : ""
+                  }`}
                   className="group flex items-center justify-between gap-3 py-3 text-sm text-muted transition-colors hover:text-ink"
                 >
                   {q}

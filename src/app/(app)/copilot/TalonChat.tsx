@@ -43,6 +43,8 @@ export function TalonChat({
   initialMessages = [],
   initialChats = [],
   initialChatId = null,
+  dashboardId = "",
+  dashboardName = "",
 }: {
   posts: { id: string; label: string }[];
   summary: TalonSummary;
@@ -51,6 +53,8 @@ export function TalonChat({
   initialMessages?: Message[];
   initialChats?: ChatSummary[];
   initialChatId?: string | null;
+  dashboardId?: string;
+  dashboardName?: string;
 }) {
   const [chatId, setChatId] = useState<string | null>(initialChatId);
   const [chats, setChats] = useState<ChatSummary[]>(initialChats);
@@ -83,7 +87,7 @@ export function TalonChat({
     setInput("");
     startTransition(async () => {
       try {
-        const r = await sendToTalon(q, chatId, postId);
+        const r = await sendToTalon(q, chatId, postId, dashboardId);
         if (r.chatId) setChatId(r.chatId);
         setHistoryWarning(r.historyWarning ?? null);
         setMessages((m) => [
@@ -92,7 +96,7 @@ export function TalonChat({
             ? { role: "talon", text: r.answer, evidence: r.evidence, total: r.total, sampled: r.sampled }
             : { role: "error", text: r.message, question: q },
         ]);
-        listChats().then(setChats).catch(() => {});
+        listChats(dashboardId).then(setChats).catch(() => {});
       } catch {
         setMessages((m) => [...m, { role: "error", text: "Lost connection. Please try again.", question: q }]);
       }
@@ -149,7 +153,7 @@ export function TalonChat({
             disabled={pending}
             className="max-w-[45%] rounded-lg border border-navy-700 bg-navy-900 px-2.5 py-1.5 text-xs text-ink outline-none focus:border-brand-blue"
           >
-            <option value="">All analyzed posts</option>
+            <option value="">{dashboardName ? `All posts in ${dashboardName}` : "All analyzed posts"}</option>
             {posts.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.label}
@@ -337,10 +341,12 @@ export function TalonChat({
       <aside className="space-y-4">
         <div className="panel p-4">
           <p className="flex items-center gap-1.5 text-xs text-muted">
-            <History size={13} /> Saved chats
+            <History size={13} /> Saved chats{dashboardName ? ` · ${dashboardName}` : ""}
           </p>
           {chats.length === 0 ? (
-            <p className="mt-2 text-xs text-faint">Your conversations will be saved here.</p>
+            <p className="mt-2 text-xs text-faint">
+              {dashboardName ? `Chats about ${dashboardName} will be saved here.` : "Your conversations will be saved here."}
+            </p>
           ) : (
             <ul className="mt-2 max-h-64 space-y-0.5 overflow-y-auto">
               {chats.map((c) => (
@@ -374,6 +380,7 @@ export function TalonChat({
           <p className="font-display num mt-2 text-3xl leading-none">{summary.total.toLocaleString()}</p>
           <p className="text-xs text-muted">
             analyzed comments across {posts.length} {posts.length === 1 ? "post" : "posts"}
+            {dashboardName ? ` in ${dashboardName}` : ""}
           </p>
           <div className="mt-3">
             <SentimentBar counts={summary.sentiment} height={8} />

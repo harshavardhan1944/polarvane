@@ -40,14 +40,22 @@ async function getUser() {
   return { supabase, user };
 }
 
-export async function listChats(): Promise<ChatSummary[]> {
+// Chats for one dashboard ("" = chats not tied to a dashboard, i.e. "All posts").
+export async function listChats(dashboardId = ""): Promise<ChatSummary[]> {
   const { supabase, user } = await getUser();
   if (!user) return [];
-  const { data } = await supabase
-    .from("talon_chats")
-    .select("id, title, updated_at")
-    .order("updated_at", { ascending: false })
-    .limit(50);
+  let q = supabase.from("talon_chats").select("id, title, updated_at").order("updated_at", { ascending: false }).limit(50);
+  q = dashboardId && UUID.test(dashboardId) ? q.eq("dashboard_id", dashboardId) : q.is("dashboard_id", null);
+  const { data, error } = await q;
+  if (error) {
+    // The per-dashboard update isn't applied yet: show all chats.
+    const { data: all } = await supabase
+      .from("talon_chats")
+      .select("id, title, updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(50);
+    return (all ?? []) as ChatSummary[];
+  }
   return (data ?? []) as ChatSummary[];
 }
 
@@ -84,7 +92,12 @@ export async function deleteChat(chatId: string) {
   await supabase.from("talon_chats").delete().eq("id", chatId);
 }
 
-export async function sendToTalon(question: string, chatIdIn: string | null, postId: string): Promise<TalonReply> {
+export async function sendToTalon(
+  question: string,
+  chatIdIn: string | null,
+  postId: string,
+  dashboardId = "",
+): Promise<TalonReply> {
   const q = (question ?? "").trim();
   if (!q) return { ok: false, message: "Please type a question.", chatId: chatIdIn };
   if (q.length > 1000) return { ok: false, message: "Please keep questions under 1,000 characters.", chatId: chatIdIn };
@@ -93,6 +106,19 @@ export async function sendToTalon(question: string, chatIdIn: string | null, pos
   if (!user) return { ok: false, message: "Your session has expired. Please sign in again.", chatId: chatIdIn };
 
   let scopeLabel = "all analyzed posts";
+  // Dashboard scope: only that dashboard's completed posts.
+  const dash = dashboardId && UUID.test(dashboardId) ? dashboardId : "";
+  let dashPostIds: string[] | undefined;
+  if (dash) {
+    const { data: d } = await supabase.from("dashboards").select("name").eq("id", dash).maybeSingle();
+    const { data: ps } = await supabase
+      .from("analyses")
+      .select("id")
+      .eq("dashboard_id", dash)
+      .eq("status", "completed");
+    dashPostIds = (ps ?? []).map((p) => p.id as string);
+    scopeLabel = `the dashboard "${d?.name ?? "dashboard"}" (${dashPostIds.length} posts)`;
+  }
   if (postId) {
     if (!UUID.test(postId)) return { ok: false, message: "Invalid post.", chatId: chatIdIn };
     const { data: a } = await supabase.from("analyses").select("shortcode, post_type").eq("id", postId).maybeSingle();
@@ -117,13 +143,17 @@ export async function sendToTalon(question: string, chatIdIn: string | null, pos
     else history = (prev ?? []).reverse().map((m) => ({ role: m.role as "user" | "talon", text: m.text }));
   }
   if (!chatId) {
-    const { data: chat, error } = await supabase
+    const base: Record<string, string | null> = { user_id: user.id, title: q.slice(0, 80), post_id: postId || null };
+    let { data: chat, error } = await supabase
       .from("talon_chats")
-      .insert({ user_id: user.id, title: q.slice(0, 80), post_id: postId || null })
+      .insert(dash ? ({ ...base, dashboard_id: dash } as Record<string, string | null>) : base)
       .select("id")
       .single();
+    if (error && dash && /dashboard_id|schema cache/i.test(error.message)) {
+      ({ data: chat, error } = await supabase.from("talon_chats").insert(base).select("id").single());
+    }
     if (error) historyWarning = isMissingTable(error.message) ? HISTORY_MISSING : "This chat couldn’t be saved.";
-    else chatId = chat.id as string;
+    else if (chat) chatId = chat.id as string;
   }
   const save = async (row: { role: string; text: string; evidence?: unknown; meta?: unknown }) => {
     if (!chatId) return;
@@ -135,7 +165,7 @@ export async function sendToTalon(question: string, chatIdIn: string | null, pos
   // ---- Answer ----
   let rows;
   try {
-    ({ rows } = await loadComments(supabase, postId || undefined));
+    ({ rows } = await loadComments(supabase, postId || undefined, !postId ? dashPostIds : undefined));
   } catch (e) {
     console.error("[polarvane] talon load failed:", e);
     const message = "Couldn’t load your comments. Please try again.";
@@ -153,6 +183,7 @@ export async function sendToTalon(question: string, chatIdIn: string | null, pos
   {
     let cq = supabase.from("analyses").select("caption").eq("status", "completed").not("caption", "is", null).limit(10);
     if (postId) cq = cq.eq("id", postId);
+    else if (dashPostIds) cq = cq.in("id", dashPostIds.length ? dashPostIds : ["00000000-0000-0000-0000-000000000000"]);
     const { data: caps } = await cq;
     captions = (caps ?? []).map((c) => String(c.caption ?? "")).filter(Boolean);
   }
