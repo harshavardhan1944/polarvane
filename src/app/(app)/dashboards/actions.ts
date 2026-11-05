@@ -60,3 +60,19 @@ export async function moveToDashboard(analysisId: string, dashboardId: string): 
   refresh();
   return { ok: true };
 }
+
+export async function renameDashboard(
+  id: string,
+  name: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (!UUID.test(id)) return { ok: false, message: "Invalid request." };
+  const clean = (name ?? "").replace(/\s+/g, " ").trim();
+  if (!clean) return { ok: false, message: "Please give the dashboard a name." };
+  if (clean.length > 80) return { ok: false, message: "Please keep the name under 80 characters." };
+  const { supabase, user } = await auth();
+  if (!user) return { ok: false, message: "Your session has expired. Please sign in again." };
+  const { error } = await supabase.from("dashboards").update({ name: clean }).eq("id", id);
+  if (error) return { ok: false, message: "Couldn’t rename the dashboard. Please try again." };
+  refresh();
+  return { ok: true };
+}

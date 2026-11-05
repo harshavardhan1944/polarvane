@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Loader2, Plus, Trash2, X } from "lucide-react";
-import { createDashboard, deleteDashboard } from "@/app/(app)/dashboards/actions";
+import { Check, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { createDashboard, deleteDashboard, renameDashboard } from "@/app/(app)/dashboards/actions";
 
 export function DashboardSwitcher({
   dashboards,
@@ -22,6 +22,8 @@ export function DashboardSwitcher({
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [newName, setNewName] = useState("");
   const [pending, startTransition] = useTransition();
 
   if (dashboards === null) {
@@ -33,6 +35,17 @@ export function DashboardSwitcher({
   }
 
   const href = (id: string) => (id ? `${basePath}?d=${id}` : basePath);
+  const currentName = dashboards.find((d) => d.id === current)?.name ?? "";
+
+  function rename() {
+    setError(null);
+    startTransition(async () => {
+      const r = await renameDashboard(current, newName);
+      if (!r.ok) return setError(r.message);
+      setRenaming(false);
+      router.refresh();
+    });
+  }
 
   function create() {
     setError(null);
@@ -108,36 +121,84 @@ export function DashboardSwitcher({
           </button>
         )}
 
-        {current &&
-          (confirmDelete ? (
-            <span className="ml-auto inline-flex items-center gap-2 text-xs text-muted">
-              Delete this dashboard? Its posts are kept.
-              <button
-                onClick={() =>
-                  startTransition(async () => {
-                    await deleteDashboard(current);
-                    setConfirmDelete(false);
-                    router.push(basePath);
-                  })
-                }
-                className="rounded-md border border-negative/40 px-2 py-1 text-red-200 hover:bg-negative/10"
+        {current && (
+          <span className="ml-auto inline-flex items-center gap-1">
+            {renaming ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  rename();
+                }}
+                className="flex items-center gap-1.5"
               >
-                Delete
-              </button>
-              <button onClick={() => setConfirmDelete(false)} className="px-1 hover:text-ink">
-                Cancel
-              </button>
-            </span>
-          ) : (
-            <button
-              onClick={() => setConfirmDelete(true)}
-              title="Delete this dashboard"
-              aria-label="Delete this dashboard"
-              className="ml-auto rounded-md p-1.5 text-faint hover:text-red-300"
-            >
-              <Trash2 size={14} />
-            </button>
-          ))}
+                <input
+                  autoFocus
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  maxLength={80}
+                  aria-label="Dashboard name"
+                  className="w-52 rounded-full border border-brand-blue/60 bg-navy-900 px-3.5 py-1.5 text-sm outline-none"
+                />
+                <button
+                  type="submit"
+                  disabled={pending || !newName.trim()}
+                  aria-label="Save name"
+                  className="brand-gradient inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                >
+                  {pending ? <Loader2 size={13} className="animate-spin" /> : <Check size={14} />} Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRenaming(false)}
+                  aria-label="Cancel rename"
+                  className="rounded-full p-1.5 text-faint hover:text-ink"
+                >
+                  <X size={15} />
+                </button>
+              </form>
+            ) : confirmDelete ? (
+              <span className="inline-flex items-center gap-2 text-xs text-muted">
+                Delete “{currentName}”? Its posts are kept.
+                <button
+                  onClick={() =>
+                    startTransition(async () => {
+                      await deleteDashboard(current);
+                      setConfirmDelete(false);
+                      router.push(basePath);
+                    })
+                  }
+                  className="rounded-md border border-negative/40 px-2 py-1 text-red-200 hover:bg-negative/10"
+                >
+                  Delete
+                </button>
+                <button onClick={() => setConfirmDelete(false)} className="px-1 hover:text-ink">
+                  Cancel
+                </button>
+              </span>
+            ) : (
+              <>
+                <button
+                  onClick={() => {
+                    setNewName(currentName);
+                    setRenaming(true);
+                    setError(null);
+                  }}
+                  className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-muted hover:text-ink"
+                >
+                  <Pencil size={13} /> Rename
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(true)}
+                  title="Delete this dashboard"
+                  aria-label="Delete this dashboard"
+                  className="rounded-md p-1.5 text-faint hover:text-red-300"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </>
+            )}
+          </span>
+        )}
       </nav>
       {error && <p className="mt-2 text-xs text-red-300">{error}</p>}
     </div>
