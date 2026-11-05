@@ -3,7 +3,9 @@ import "server-only";
 // Talks to Apify's Instagram Comments Scraper (apify/instagram-comment-scraper).
 // Runs ONLY on the server. The APIFY_TOKEN never reaches the browser.
 
-const ACTOR = "apify~instagram-comment-scraper";
+// Which Apify tool collects comments. Default: Apify's official scraper.
+// Set APIFY_ACTOR in Vercel to switch, e.g. "scrapesmith/instagram-comments-scraper".
+const ACTOR = (process.env.APIFY_ACTOR ?? "apify/instagram-comment-scraper").trim().replace("/", "~");
 const API = "https://api.apify.com/v2";
 
 export class ApifyError extends Error {
@@ -80,11 +82,10 @@ async function apifyFetch(path: string, init?: RequestInit) {
 }
 
 export async function startCommentRun(postUrl: string, limit: number) {
-  const input = {
-    directUrls: [postUrl],
-    resultsLimit: limit,
-    includeNestedComments: false,
-  };
+  // Each Apify tool names its inputs differently.
+  const input = ACTOR.startsWith("scrapesmith~")
+    ? { postUrls: [postUrl], maxCommentsPerPost: limit }
+    : { directUrls: [postUrl], resultsLimit: limit, includeNestedComments: false };
   // maxItems caps what Apify will charge for, as a second safety limit.
   const json = await apifyFetch(`/acts/${ACTOR}/runs?maxItems=${limit}`, {
     method: "POST",
@@ -163,12 +164,12 @@ export function mapApifyItems(items: Record<string, unknown>[]) {
       errors.push(String(item.errorDescription ?? item.error));
       continue;
     }
-    const text = str(item.text) ?? str(item.commentText) ?? str(item.content);
+    const text = str(item.text) ?? str(item.commentText) ?? str(item.comment) ?? str(item.content);
     if (!text) continue;
 
     const owner = (item.owner ?? {}) as Record<string, unknown>;
-    const author = str(item.ownerUsername) ?? str(owner.username) ?? str(item.username);
-    const postedAt = toIso(item.timestamp ?? item.createdAt ?? item.created_at);
+    const author = str(item.ownerUsername) ?? str(owner.username) ?? str(item.username) ?? str(item.author);
+    const postedAt = toIso(item.timestamp ?? item.createdAt ?? item.created_at ?? item.date);
     const id =
       str(item.id) ??
       (typeof item.id === "number" ? String(item.id) : null) ??
@@ -187,7 +188,7 @@ export function mapApifyItems(items: Record<string, unknown>[]) {
       text: text.slice(0, 5000),
       author_username: author,
       posted_at: postedAt,
-      like_count: num(item.likesCount) ?? num(item.likeCount) ?? num(item.likes_count),
+      like_count: num(item.likesCount) ?? num(item.likeCount) ?? num(item.likes_count) ?? num(item.likes),
       reply_count:
         num(item.repliesCount) ??
         num(item.replyCount) ??
