@@ -5,7 +5,7 @@ import { AlertCircle, CheckCircle2, Info, Loader2, Link2 } from "lucide-react";
 import { parseInstagramUrl } from "@/lib/instagram";
 import { createAnalysis, type CreateAnalysisState } from "./actions";
 
-export function NewAnalysisForm() {
+export function NewAnalysisForm({ dashboardId = "" }: { dashboardId?: string }) {
   const [state, action, pending] = useActionState<CreateAnalysisState, FormData>(createAnalysis, {
     status: "idle",
   });
@@ -35,6 +35,7 @@ export function NewAnalysisForm() {
         onSubmit={() => setTouched(true)}
         className="flex flex-col gap-3 sm:flex-row"
       >
+        <input type="hidden" name="dashboard" value={dashboardId} />
         <div className="relative flex-1">
           <Link2 size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
           <input

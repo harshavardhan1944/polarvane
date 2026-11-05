@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { COMMENT_LIMITS, estimateApifyCost, isAllOption, limitLabel } from "@/lib/pricing";
 import { SentimentBar, SentimentLegend } from "@/components/charts";
+import { moveToDashboard } from "../dashboards/actions";
 import {
   analyzeNextBatch,
   checkCollection,
@@ -22,7 +23,6 @@ import {
   fetchDetails,
   reanalyze,
   rereadLastRun,
-  setPostKind,
   startCollection,
 } from "./actions";
 
@@ -39,8 +39,8 @@ export type AnalysisRowData = {
   created_label: string;
   summary: { positive: number; neutral: number; negative: number; failed: number } | null;
   has_details: boolean;
-  has_kinds: boolean;
-  post_kind?: string | null;
+  dashboards: { id: string; name: string }[] | null;
+  dashboard_id?: string | null;
   caption?: string | null;
   post_owner?: string | null;
   likes_count?: number | null;
@@ -198,23 +198,26 @@ export function AnalysisRow({ row }: { row: AnalysisRowData }) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {row.has_kinds && (
+          {row.dashboards && row.dashboards.length > 0 && (
             <select
-              aria-label="Post type"
-              value={row.post_kind ?? ""}
+              aria-label="Dashboard"
+              title="Which dashboard this post belongs to"
+              value={row.dashboard_id ?? ""}
               onChange={(e) =>
                 startTransition(async () => {
-                  const r = await setPostKind(row.id, e.target.value);
+                  const r = await moveToDashboard(row.id, e.target.value);
                   if (!r.ok && r.message) setMessage(r.message);
                   router.refresh();
                 })
               }
-              className="rounded-full border border-navy-600 bg-navy-900 px-2.5 py-1 text-xs text-ink outline-none focus:border-brand-blue"
+              className="max-w-[11rem] truncate rounded-full border border-navy-600 bg-navy-900 px-2.5 py-1 text-xs text-ink outline-none focus:border-brand-blue"
             >
-              <option value="">Set post type…</option>
-              <option value="collaboration">Creator collaboration</option>
-              <option value="brand">Brand post</option>
-              <option value="other">Other</option>
+              <option value="">No dashboard</option>
+              {row.dashboards.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
             </select>
           )}
           <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${badge.cls}`}>

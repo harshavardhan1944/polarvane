@@ -46,17 +46,26 @@ export async function createAnalysis(
   if (existing) {
     return {
       status: "duplicate",
-      message: "You’ve already added this post. It’s in your list below.",
+      message:
+        "You’ve already added this post. Find it under “All posts” and use its Dashboard menu to move it here.",
     };
   }
 
-  const { error: insertError } = await supabase.from("analyses").insert({
+  const dashboard = String(formData.get("dashboard") ?? "");
+  const row: Record<string, string> = {
     user_id: user.id,
     post_url: parsed.canonicalUrl,
     shortcode: parsed.shortcode,
     post_type: parsed.postType,
     status: "queued",
-  });
+  };
+  let { error: insertError } = await supabase
+    .from("analyses")
+    .insert(/^[0-9a-f-]{36}$/i.test(dashboard) ? ({ ...row, dashboard_id: dashboard } as Record<string, string>) : row);
+  // If the dashboards update isn't applied yet, save without a dashboard.
+  if (insertError && /dashboard_id|schema cache/i.test(insertError.message)) {
+    ({ error: insertError } = await supabase.from("analyses").insert(row));
+  }
   if (insertError) {
     if (insertError.code === "23505")
       return { status: "duplicate", message: "You’ve already added this post. It’s in your list below." };
@@ -392,20 +401,6 @@ export async function rereadLastRun(id: string): Promise<CollectionResult> {
 
 
 // ---------------- Post type + re-analysis ----------------
-
-export async function setPostKind(id: string, kind: string): Promise<{ ok: boolean; message?: string }> {
-  if (!/^[0-9a-f-]{36}$/i.test(id)) return { ok: false, message: "Invalid request." };
-  const value = ["collaboration", "brand", "other"].includes(kind) ? kind : null;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, message: "Your session has expired. Please sign in again." };
-  const { error } = await supabase.from("analyses").update({ post_kind: value }).eq("id", id);
-  if (error) return { ok: false, message: "Post types need the database update (part 4) in Supabase." };
-  refresh();
-  return { ok: true };
-}
 
 // Clears AI labels for a post so they're recomputed (e.g. to add the new "focus" label).
 // Collected comments are kept; only Gemini runs again.

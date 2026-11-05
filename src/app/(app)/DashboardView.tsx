@@ -15,8 +15,8 @@ function moodOf(net: number) {
 }
 
 export function DashboardView({
-  kind = "",
-  kindCounts = null,
+  dashboardId = "",
+  dashboardName = "",
   posts,
   selected,
   ins,
@@ -24,8 +24,8 @@ export function DashboardView({
   postCount,
   notice,
 }: {
-  kind?: string;
-  kindCounts?: { all: number; collaboration: number; brand: number } | null;
+  dashboardId?: string;
+  dashboardName?: string;
   posts: { id: string; label: string }[];
   selected: string;
   ins: Insights;
@@ -35,7 +35,9 @@ export function DashboardView({
 }) {
   const pc = (n: number) => (ins.total ? Math.round((n / ins.total) * 100) : 0);
   const net = pc(ins.sentiment.positive) - pc(ins.sentiment.negative);
-  const scope = selected ? posts.find((p) => p.id === selected)?.label ?? "Selected post" : "All analyzed posts";
+  const scope = selected
+    ? posts.find((p) => p.id === selected)?.label ?? "Selected post"
+    : dashboardName || "All analyzed posts";
   const topTopics = ins.topics.slice(0, 2).map((t) => t.topic);
 
   const metrics = [
@@ -75,29 +77,6 @@ export function DashboardView({
 
   return (
     <>
-      {kindCounts && (
-        <nav className="mb-6 flex flex-wrap gap-1.5" aria-label="Dashboard type">
-          {[
-            { k: "", label: "All posts", n: kindCounts.all },
-            { k: "collaboration", label: "Creator collaborations", n: kindCounts.collaboration },
-            { k: "brand", label: "Brand posts", n: kindCounts.brand },
-          ].map((t) => (
-            <Link
-              key={t.k || "all"}
-              href={t.k ? `/?kind=${t.k}` : "/"}
-              aria-current={kind === t.k ? "page" : undefined}
-              className={`rounded-full border px-3.5 py-1.5 text-sm transition-colors ${
-                kind === t.k
-                  ? "border-brand-blue/60 bg-brand-blue/15 text-ink"
-                  : "border-navy-600 bg-navy-900/50 text-muted hover:text-ink"
-              }`}
-            >
-              {t.label} <span className="num text-faint">{t.n}</span>
-            </Link>
-          ))}
-        </nav>
-      )}
-
       {/* Readout: the audience in one sentence, built from real numbers */}
       <header className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-3xl">
@@ -120,7 +99,13 @@ export function DashboardView({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <PostFilter posts={posts} value={selected} kind={kind} />
+          <PostFilter posts={posts} value={selected} dashboard={dashboardId} />
+          <Link
+            href={`/analyze${dashboardId ? `?d=${dashboardId}` : ""}`}
+            className="brand-gradient rounded-lg px-3 py-2 text-sm font-medium text-white"
+          >
+            Add post
+          </Link>
           <a
             href={`/api/export${selected ? `?analysis=${selected}` : ""}`}
             className="rounded-lg border border-navy-600 bg-navy-900/60 px-3 py-2 text-sm text-muted hover:text-ink"
@@ -148,26 +133,14 @@ export function DashboardView({
         ))}
       </section>
 
-      {kind && posts.length === 0 && (
-        <div className="panel mt-4 p-6 text-sm text-muted">
-          No posts are marked as {kind === "collaboration" ? "creator collaborations" : "brand posts"} yet. On{" "}
-          <Link href="/analyze" className="text-brand-blue hover:underline">
-            Analyze a post
-          </Link>
-          , set each post’s type.
-        </div>
-      )}
-
       {/* Who are people talking about? */}
       {ins.total > 0 && (
-        <section className={`panel mt-4 p-6 ${kind === "collaboration" ? "ring-1 ring-brand-violet/40" : ""}`}>
+        <section className="panel mt-4 p-6">
           <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="text-[15px] font-semibold">Who are people talking about?</h2>
               <p className="text-xs text-muted">
-                {kind === "collaboration"
-                  ? "The key question for a collaboration: did the audience notice the product, or only the creator?"
-                  : "Whether comments are about the product and brand, the person in the post, or something else"}
+                Did the audience talk about the product and brand, or about the person in the post?
               </p>
             </div>
             {ins.focusTotal > 0 && (
@@ -373,11 +346,23 @@ function Voices({ title, rows, tone }: { title: string; rows: CommentRow[]; tone
   );
 }
 
-export function DashboardEmpty({ failed }: { failed: boolean }) {
+export function DashboardEmpty({
+  failed,
+  dashboardId = "",
+  dashboardName = "",
+}: {
+  failed: boolean;
+  dashboardId?: string;
+  dashboardName?: string;
+}) {
   return (
     <div className="py-10">
       <h1 className="font-display max-w-2xl text-5xl leading-[1.05]">
-        {failed ? "We couldn’t load your data." : "Find out what your audience really thinks."}
+        {failed
+          ? "We couldn’t load your data."
+          : dashboardName
+            ? `“${dashboardName}” has no analyzed posts yet.`
+            : "Find out what your audience really thinks."}
       </h1>
       <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-muted">
         {failed
@@ -385,10 +370,10 @@ export function DashboardEmpty({ failed }: { failed: boolean }) {
           : "Paste a public Instagram post or Reel link. Polarvane collects the comments, labels each one as positive, neutral or negative, and groups them into topics. This page fills in once your first analysis finishes."}
       </p>
       <Link
-        href="/analyze"
+        href={`/analyze${dashboardId ? `?d=${dashboardId}` : ""}`}
         className="brand-gradient mt-7 inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-brand-violet/20 hover:opacity-95"
       >
-        Analyze a post <ArrowRight size={15} />
+        {dashboardName ? "Add a post to this dashboard" : "Analyze a post"} <ArrowRight size={15} />
       </Link>
     </div>
   );

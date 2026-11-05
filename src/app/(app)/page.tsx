@@ -1,4 +1,5 @@
-import { PageHeader } from "@/components/NotBuiltYet";
+import { DashboardSwitcher } from "@/components/DashboardSwitcher";
+import { listDashboards } from "@/lib/dashboards";
 import { computeInsights, keyInsights, loadComments, type CommentRow } from "@/lib/insights";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardEmpty, DashboardView } from "./DashboardView";
@@ -9,42 +10,33 @@ export default async function DashboardPage(props: PageProps<"/">) {
   const sp = await props.searchParams;
   const supabase = await createClient();
 
-  // Load posts with their type; fall back if the post-type database update isn't applied yet.
-  type A = { id: string; shortcode: string; post_type: string; post_kind?: string | null };
+  const dashboards = await listDashboards(supabase);
+  const current =
+    typeof sp.d === "string" && dashboards?.some((d) => d.id === sp.d) ? sp.d : "";
+  const currentName = dashboards?.find((d) => d.id === current)?.name ?? "";
+
+  // Completed posts, with their dashboard (falls back if the dashboards update isn't applied).
+  type A = { id: string; shortcode: string; post_type: string; dashboard_id?: string | null };
   const q = (cols: string) =>
     supabase.from("analyses").select(cols).eq("status", "completed").order("created_at", { ascending: false });
-  let { data: analyses, error } = (await q("id, shortcode, post_type, post_kind")) as unknown as {
-    data: A[] | null;
-    error: { message: string } | null;
-  };
-  let hasKinds = true;
+  type R = { data: A[] | null; error: { message: string } | null };
+  let { data: analyses, error } = (await q("id, shortcode, post_type, dashboard_id")) as unknown as R;
   if (error && /column|schema cache/i.test(error.message)) {
-    hasKinds = false;
-    ({ data: analyses, error } = (await q("id, shortcode, post_type")) as unknown as {
-      data: A[] | null;
-      error: { message: string } | null;
-    });
+    ({ data: analyses, error } = (await q("id, shortcode, post_type")) as unknown as R);
   }
 
-  const kind = sp.kind === "collaboration" || sp.kind === "brand" ? sp.kind : "";
-  const all = (analyses ?? []).map((a) => ({
-    id: a.id,
-    kind: a.post_kind ?? "",
-    label: `${a.post_type === "reel" ? "Reel" : "Post"} · ${a.shortcode}`,
-  }));
-  const counts = {
-    all: all.length,
-    collaboration: all.filter((p) => p.kind === "collaboration").length,
-    brand: all.filter((p) => p.kind === "brand").length,
-  };
-  const posts = kind ? all.filter((p) => p.kind === kind) : all;
+  const posts = (analyses ?? [])
+    .filter((a) => !current || a.dashboard_id === current)
+    .map((a) => ({ id: a.id, label: `${a.post_type === "reel" ? "Reel" : "Post"} · ${a.shortcode}` }));
   const selected = typeof sp.post === "string" && posts.some((p) => p.id === sp.post) ? sp.post : "";
 
-  if (error || all.length === 0) {
+  const switcher = <DashboardSwitcher dashboards={dashboards} current={current} />;
+
+  if (error || posts.length === 0) {
     return (
       <>
-        <PageHeader title="Dashboard" subtitle="Audience sentiment and topics across the Instagram posts you analyze." />
-        <DashboardEmpty failed={Boolean(error)} />
+        {switcher}
+        <DashboardEmpty failed={Boolean(error)} dashboardId={current} dashboardName={currentName} />
       </>
     );
   }
@@ -55,7 +47,7 @@ export default async function DashboardPage(props: PageProps<"/">) {
     const r = await loadComments(
       supabase,
       selected || undefined,
-      !selected && kind ? posts.map((p) => p.id) : undefined,
+      !selected && current ? posts.map((p) => p.id) : undefined,
     );
     rows = r.rows;
     if (r.truncated) notice = "Showing the first 20,000 comments. Pick a single post for its full results.";
@@ -66,15 +58,18 @@ export default async function DashboardPage(props: PageProps<"/">) {
   const ins = computeInsights(rows);
 
   return (
-    <DashboardView
-      kind={kind}
-      kindCounts={hasKinds ? counts : null}
-      posts={posts}
-      selected={selected}
-      ins={ins}
-      insights={keyInsights(ins)}
-      postCount={selected ? 1 : posts.length}
-      notice={notice}
-    />
+    <>
+      {switcher}
+      <DashboardView
+        dashboardId={current}
+        dashboardName={currentName}
+        posts={posts}
+        selected={selected}
+        ins={ins}
+        insights={keyInsights(ins)}
+        postCount={selected ? 1 : posts.length}
+        notice={notice}
+      />
+    </>
   );
 }
