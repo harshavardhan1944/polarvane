@@ -2,7 +2,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/NotBuiltYet";
 import { computeInsights, loadComments } from "@/lib/insights";
 import { createClient } from "@/lib/supabase/server";
-import { listChats } from "./actions";
+import { listChats, loadChat, type StoredMessage } from "./actions";
 import { TalonChat, type TalonSummary } from "./TalonChat";
 
 export const instant = false;
@@ -50,12 +50,33 @@ export default async function CopilotPage(props: PageProps<"/copilot">) {
 
   const chats = await listChats().catch(() => []);
   const q = typeof sp.q === "string" ? sp.q.slice(0, 1000) : "";
-  const post = typeof sp.post === "string" && posts.some((p) => p.id === sp.post) ? sp.post : "";
+  let post = typeof sp.post === "string" && posts.some((p) => p.id === sp.post) ? sp.post : "";
+
+  // Reopen the most recent conversation, unless a new question was sent from the dashboard.
+  let initialChatId: string | null = null;
+  let initialMessages: StoredMessage[] = [];
+  if (!q && chats[0]) {
+    const last = await loadChat(chats[0].id).catch(() => null);
+    if (last) {
+      initialChatId = chats[0].id;
+      initialMessages = last.messages;
+      if (last.postId && posts.some((p) => p.id === last.postId)) post = last.postId;
+    }
+  }
 
   return (
     <>
       <h1 className="sr-only">Talon copilot</h1>
-      <TalonChat key={`${q}|${post}`} posts={posts} summary={summary} initialQuestion={q} initialPost={post} initialChats={chats} />
+      <TalonChat
+        key={`${q}|${post}|${initialChatId ?? ""}`}
+        posts={posts}
+        summary={summary}
+        initialQuestion={q}
+        initialPost={post}
+        initialChats={chats}
+        initialChatId={initialChatId}
+        initialMessages={initialMessages}
+      />
     </>
   );
 }

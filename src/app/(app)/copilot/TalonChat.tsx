@@ -42,6 +42,7 @@ export function TalonChat({
   initialPost = "",
   initialMessages = [],
   initialChats = [],
+  initialChatId = null,
 }: {
   posts: { id: string; label: string }[];
   summary: TalonSummary;
@@ -49,8 +50,9 @@ export function TalonChat({
   initialPost?: string;
   initialMessages?: Message[];
   initialChats?: ChatSummary[];
+  initialChatId?: string | null;
 }) {
-  const [chatId, setChatId] = useState<string | null>(null);
+  const [chatId, setChatId] = useState<string | null>(initialChatId);
   const [chats, setChats] = useState<ChatSummary[]>(initialChats);
   const [historyWarning, setHistoryWarning] = useState<string | null>(null);
   const [loadingChat, setLoadingChat] = useState(false);
