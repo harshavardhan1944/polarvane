@@ -81,11 +81,11 @@ async function apifyFetch(path: string, init?: RequestInit) {
   throw new ApifyError(`Apify returned an error (${res.status}).${detail}`, "other");
 }
 
-export async function startCommentRun(postUrl: string, limit: number) {
+export async function startCommentRun(postUrl: string, limit: number, includeReplies = false) {
   // Each Apify tool names its inputs differently.
   const input = ACTOR.startsWith("scrapesmith~")
     ? { postUrls: [postUrl], maxCommentsPerPost: limit }
-    : { directUrls: [postUrl], resultsLimit: limit, includeNestedComments: false };
+    : { directUrls: [postUrl], resultsLimit: limit, includeNestedComments: includeReplies };
   // maxItems caps what Apify will charge for, as a second safety limit.
   const json = await apifyFetch(`/acts/${ACTOR}/runs?maxItems=${limit}`, {
     method: "POST",
@@ -154,10 +154,21 @@ function toIso(v: unknown) {
 // Keep only the fields we need (data minimisation): no profile pictures or owner IDs.
 const RAW_KEEP = ["id", "text", "ownerUsername", "timestamp", "likesCount", "repliesCount", "postUrl", "position"];
 
-export function mapApifyItems(items: Record<string, unknown>[]) {
+export function mapApifyItems(rawItems: Record<string, unknown>[]) {
   const comments: CollectedComment[] = [];
   const errors: string[] = [];
   const seen = new Set<string>();
+
+  // Replies may arrive nested inside their parent comment; treat each as its own comment.
+  const items: Record<string, unknown>[] = [];
+  for (const it of rawItems) {
+    items.push(it);
+    for (const key of ["replies", "childComments", "nestedComments"]) {
+      const nested = it[key];
+      if (Array.isArray(nested))
+        for (const r of nested) if (r && typeof r === "object") items.push(r as Record<string, unknown>);
+    }
+  }
 
   for (const item of items) {
     if (item.error || item.errorDescription) {

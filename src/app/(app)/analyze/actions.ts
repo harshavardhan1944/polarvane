@@ -4,7 +4,7 @@ import { refresh } from "next/cache";
 import { parseInstagramUrl } from "@/lib/instagram";
 import { ApifyError, getDatasetItems, getRun, mapApifyItems, startCommentRun } from "@/lib/apify";
 import { AiError, classifyComments } from "@/lib/ai";
-import { COMMENT_LIMITS } from "@/lib/pricing";
+import { ALL_COMMENTS, COMMENT_LIMITS } from "@/lib/pricing";
 import { createClient } from "@/lib/supabase/server";
 
 export type CreateAnalysisState =
@@ -131,7 +131,7 @@ export async function startCollection(id: string, limit: number): Promise<Collec
   if (!claimed || claimed.length === 0) return { ok: false, message: "This post is already being processed." };
 
   try {
-    const { runId } = await startCommentRun(analysis.post_url, limit);
+    const { runId } = await startCommentRun(analysis.post_url, limit, limit >= ALL_COMMENTS);
     await supabase.from("analyses").update({ apify_run_id: runId }).eq("id", id);
     refresh();
     return { ok: true, status: "collecting" };

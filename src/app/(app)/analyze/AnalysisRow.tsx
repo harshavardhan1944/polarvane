@@ -12,7 +12,7 @@ import {
   RotateCcw,
   Trash2,
 } from "lucide-react";
-import { COMMENT_LIMITS, estimateApifyCost } from "@/lib/pricing";
+import { ALL_COMMENTS, COMMENT_LIMITS, estimateApifyCost, limitLabel } from "@/lib/pricing";
 import { SentimentBar, SentimentLegend } from "@/components/charts";
 import { analyzeNextBatch, checkCollection, deleteAnalysis, startCollection } from "./actions";
 
@@ -177,8 +177,8 @@ export function AnalysisRow({ row }: { row: AnalysisRowData }) {
 
       {row.status === "collecting" && (
         <p className="mt-3 text-xs text-muted">
-          Apify is reading the comments. This usually takes 1–3 minutes ({elapsed}s so far). You can leave this
-          page and come back.
+          Apify is reading the comments. Small posts take 1–3 minutes; posts with 1,000+ comments can take 5–10
+          minutes ({elapsed}s so far). You can leave this page and come back.
         </p>
       )}
 
@@ -241,12 +241,16 @@ export function AnalysisRow({ row }: { row: AnalysisRowData }) {
             >
               {COMMENT_LIMITS.map((n) => (
                 <option key={n} value={n}>
-                  {n.toLocaleString()} comments
+                  {limitLabel(n)}
                 </option>
               ))}
             </select>
           </label>
-          <span className="text-xs text-faint">Estimated Apify cost: about {estimateApifyCost(limit)}</span>
+          <span className="text-xs text-faint">
+            {limit === ALL_COMMENTS
+              ? "You pay only for comments actually collected: about $2.30–2.70 per 1,000 (e.g. ~1,100 comments ≈ $2.50–3.00)"
+              : `Estimated Apify cost: about ${estimateApifyCost(limit)}`}
+          </span>
           <div className="flex gap-2 sm:ml-auto">
             {!confirming ? (
               <button
@@ -272,7 +276,7 @@ export function AnalysisRow({ row }: { row: AnalysisRowData }) {
                   className="brand-gradient inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
                 >
                   {pending && <Loader2 size={13} className="animate-spin" />}
-                  Confirm · up to {estimateApifyCost(limit).split("–")[1]}
+                  Confirm · {limit === ALL_COMMENTS ? "max $13.50" : `up to ${estimateApifyCost(limit).split("–")[1]}`}
                 </button>
               </>
             )}
