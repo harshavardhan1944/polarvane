@@ -215,11 +215,13 @@ export async function geminiJson(req: GeminiRequest): Promise<unknown> {
   }
 }
 
-async function classifyOnce(comments: CommentInput[]): Promise<CommentResult[]> {
+async function classifyOnce(comments: CommentInput[], context?: string): Promise<CommentResult[]> {
   const payload = comments.map((c) => ({ id: c.id, text: maskMentions(c.text).slice(0, 1500) }));
   const parsed = (await geminiJson({
     system: INSTRUCTIONS,
-    user: `Label these ${payload.length} Instagram comments (JSON):\n${JSON.stringify(payload)}`,
+    user: `${
+      context ? `Context — the post's caption (for understanding only; do not label it):\n${context.slice(0, 1500)}\n\n` : ""
+    }Label these ${payload.length} Instagram comments (JSON):\n${JSON.stringify(payload)}`,
     schema: RESPONSE_SCHEMA,
   })) as { results?: unknown };
   const results = parsed?.results;
@@ -249,14 +251,14 @@ async function classifyOnce(comments: CommentInput[]): Promise<CommentResult[]> 
 
 // If the AI refuses a batch (e.g. one very offensive comment), split it so the
 // other comments still get analyzed. Comments it refuses alone stay unlabelled.
-export async function classifyComments(comments: CommentInput[]): Promise<CommentResult[]> {
+export async function classifyComments(comments: CommentInput[], context?: string): Promise<CommentResult[]> {
   try {
-    return await classifyOnce(comments);
+    return await classifyOnce(comments, context);
   } catch (err) {
     if (err instanceof AiError && err.kind === "blocked" && comments.length > 1) {
       const mid = Math.ceil(comments.length / 2);
-      const a = await classifyComments(comments.slice(0, mid));
-      const b = await classifyComments(comments.slice(mid));
+      const a = await classifyComments(comments.slice(0, mid), context);
+      const b = await classifyComments(comments.slice(mid), context);
       return [...a, ...b];
     }
     if (err instanceof AiError && err.kind === "blocked") return [];

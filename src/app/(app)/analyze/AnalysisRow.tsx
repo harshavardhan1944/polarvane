@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { COMMENT_LIMITS, estimateApifyCost, isAllOption, limitLabel } from "@/lib/pricing";
 import { SentimentBar, SentimentLegend } from "@/components/charts";
-import { analyzeNextBatch, checkCollection, deleteAnalysis, startCollection } from "./actions";
+import { analyzeNextBatch, checkCollection, deleteAnalysis, fetchDetails, startCollection } from "./actions";
 
 export type AnalysisRowData = {
   id: string;
@@ -28,6 +28,14 @@ export type AnalysisRowData = {
   created_at: string;
   created_label: string;
   summary: { positive: number; neutral: number; negative: number; failed: number } | null;
+  has_details: boolean;
+  caption?: string | null;
+  post_owner?: string | null;
+  likes_count?: number | null;
+  views_count?: number | null;
+  comments_reported?: number | null;
+  post_published_at?: string | null;
+  details_status?: string | null;
 };
 
 const BADGE: Record<AnalysisRowData["status"], { label: string; cls: string }> = {
@@ -46,6 +54,31 @@ export function AnalysisRow({ row }: { row: AnalysisRowData }) {
   const [pending, startTransition] = useTransition();
   const [elapsed, setElapsed] = useState(0);
   const checking = useRef(false);
+
+  // Fetch the post's caption and counts once, automatically.
+  const [detailsMsg, setDetailsMsg] = useState<string | null>(null);
+  const [detailsBusy, setDetailsBusy] = useState(false);
+  const detailsAsked = useRef(false);
+  async function getDetails() {
+    setDetailsBusy(true);
+    setDetailsMsg(null);
+    try {
+      const r = await fetchDetails(row.id);
+      if (!r.ok) setDetailsMsg(r.message);
+      router.refresh();
+    } catch {
+      setDetailsMsg("Couldn’t fetch post details.");
+    } finally {
+      setDetailsBusy(false);
+    }
+  }
+  useEffect(() => {
+    if (row.has_details && !row.details_status && !detailsAsked.current) {
+      detailsAsked.current = true;
+      void getDetails();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [row.has_details, row.details_status]);
 
   // While collecting, ask the server every 5 seconds whether Apify has finished.
   useEffect(() => {
@@ -143,7 +176,10 @@ export function AnalysisRow({ row }: { row: AnalysisRowData }) {
             </a>
             <p className="text-xs text-faint">
               Added {row.created_label}
-              {row.comments_collected > 0 && ` · ${row.comments_collected.toLocaleString()} comments collected`}
+              {row.comments_collected > 0 &&
+                ` · ${row.comments_collected.toLocaleString()}${
+                  row.comments_reported ? ` of ${row.comments_reported.toLocaleString()}` : ""
+                } comments collected`}
             </p>
           </div>
         </div>
@@ -168,6 +204,41 @@ export function AnalysisRow({ row }: { row: AnalysisRowData }) {
           </form>
         </div>
       </div>
+
+      {row.has_details && (
+        <div className="mt-3 rounded-lg border border-navy-700 bg-navy-900/40 p-3">
+          {row.details_status === "done" ? (
+            <>
+              {row.caption && (
+                <p className="line-clamp-3 whitespace-pre-line text-xs leading-relaxed text-muted">{row.caption}</p>
+              )}
+              <p className="num mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-faint">
+                {row.post_owner && <span>by @{row.post_owner}</span>}
+                {row.likes_count != null && <span>{row.likes_count.toLocaleString()} likes</span>}
+                {row.views_count != null && <span>{row.views_count.toLocaleString()} views</span>}
+                {row.comments_reported != null && <span>{row.comments_reported.toLocaleString()} comments on Instagram</span>}
+                {row.post_published_at && (
+                  <span>
+                    posted{" "}
+                    {new Date(row.post_published_at).toLocaleDateString("en-IN", { dateStyle: "medium", timeZone: "Asia/Kolkata" })}
+                  </span>
+                )}
+              </p>
+            </>
+          ) : detailsBusy || row.details_status === "fetching" ? (
+            <p className="flex items-center gap-2 text-xs text-muted">
+              <Loader2 size={12} className="animate-spin" /> Fetching caption and post stats… (up to 1–2 minutes)
+            </p>
+          ) : (
+            <p className="flex flex-wrap items-center gap-2 text-xs text-muted">
+              {detailsMsg ?? "Post details not loaded."}
+              <button onClick={() => void getDetails()} className="text-brand-blue hover:underline">
+                Fetch caption and stats
+              </button>
+            </p>
+          )}
+        </div>
+      )}
 
       {row.status === "failed" && row.error_message && (
         <p className="mt-3 flex items-start gap-2 rounded-lg border border-negative/30 bg-negative/10 p-3 text-xs text-red-200">

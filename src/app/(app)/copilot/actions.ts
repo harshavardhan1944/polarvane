@@ -148,8 +148,17 @@ export async function sendToTalon(question: string, chatIdIn: string | null, pos
     return { ok: false, message, chatId, historyWarning };
   }
 
+  // Post captions give Talon context about what each post promoted (optional).
+  let captions: string[] = [];
+  {
+    let cq = supabase.from("analyses").select("caption").eq("status", "completed").not("caption", "is", null).limit(10);
+    if (postId) cq = cq.eq("id", postId);
+    const { data: caps } = await cq;
+    captions = (caps ?? []).map((c) => String(c.caption ?? "")).filter(Boolean);
+  }
+
   try {
-    const r = await askTalon(rows, q, history, scopeLabel);
+    const r = await askTalon(rows, q, history, scopeLabel, captions);
     if (!r.answer) {
       const message = "Talon couldn’t form an answer. Please rephrase and try again.";
       await save({ role: "error", text: message });

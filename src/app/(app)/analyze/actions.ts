@@ -2,7 +2,7 @@
 
 import { refresh } from "next/cache";
 import { parseInstagramUrl } from "@/lib/instagram";
-import { ApifyError, getDatasetItems, getRun, mapApifyItems, startCommentRun } from "@/lib/apify";
+import { ApifyError, fetchPostDetails, getDatasetItems, getRun, mapApifyItems, startCommentRun } from "@/lib/apify";
 import { AiError, classifyComments } from "@/lib/ai";
 import { ALL_COMMENTS, COMMENT_LIMITS } from "@/lib/pricing";
 import { createClient } from "@/lib/supabase/server";
@@ -278,9 +278,11 @@ export async function analyzeNextBatch(id: string): Promise<AnalyzeResult> {
   }
 
   if (batch && batch.length > 0) {
+    // The post caption helps the AI understand what comments refer to (optional).
+    const { data: cap } = await supabase.from("analyses").select("caption").eq("id", id).maybeSingle();
     let results;
     try {
-      results = await classifyComments(batch);
+      results = await classifyComments(batch, (cap?.caption as string | null) ?? undefined);
     } catch (err) {
       if (err instanceof AiError && (err.kind === "busy" || err.kind === "bad_output")) {
         const p = await progress();
@@ -322,4 +324,47 @@ export async function analyzeNextBatch(id: string): Promise<AnalyzeResult> {
     .eq("id", id);
   if (done) refresh();
   return { ok: true, status: done ? "completed" : "analyzing", ...p };
+}
+
+// ---------------- Post details: caption, likes, views, Instagram's comment count ----------------
+
+export type DetailsResult = { ok: true } | { ok: false; message: string };
+
+export async function fetchDetails(id: string): Promise<DetailsResult> {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return { ok: false, message: "Invalid request." };
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "Your session has expired. Please sign in again." };
+
+  const { data: analysis, error } = await supabase
+    .from("analyses")
+    .select("id, post_url, details_status")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) return { ok: false, message: "Post details need the database update (part 3) in Supabase." };
+  if (!analysis) return { ok: false, message: "Post not found." };
+  if (analysis.details_status === "fetching") return { ok: true };
+
+  await supabase.from("analyses").update({ details_status: "fetching" }).eq("id", id);
+  try {
+    const d = await fetchPostDetails(analysis.post_url);
+    if (!d) {
+      await supabase.from("analyses").update({ details_status: "failed" }).eq("id", id);
+      refresh();
+      return { ok: false, message: "Instagram didn’t return details for this post." };
+    }
+    await supabase
+      .from("analyses")
+      .update({ ...d, details_status: "done" })
+      .eq("id", id);
+    refresh();
+    return { ok: true };
+  } catch (err) {
+    console.error("[polarvane] post details failed:", err);
+    await supabase.from("analyses").update({ details_status: "failed" }).eq("id", id);
+    refresh();
+    return { ok: false, message: err instanceof ApifyError ? err.message : "Couldn’t fetch post details." };
+  }
 }

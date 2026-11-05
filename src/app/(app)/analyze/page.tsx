@@ -4,15 +4,25 @@ import { AnalysisRow, type AnalysisRowData } from "./AnalysisRow";
 import { NewAnalysisForm } from "./NewAnalysisForm";
 
 export const instant = false;
+// Fetching post details can take up to ~2 minutes.
+export const maxDuration = 300;
+
+const BASE_COLS = "id, post_url, shortcode, post_type, status, error_message, comments_collected, comment_limit, created_at";
+const DETAIL_COLS = "caption, post_owner, likes_count, views_count, comments_reported, post_published_at, details_status";
 
 export default async function AnalyzePage() {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("analyses")
-    .select("id, post_url, shortcode, post_type, status, error_message, comments_collected, comment_limit, created_at")
-    .order("created_at", { ascending: false })
-    .limit(50);
-  const base = (data ?? []) as Omit<AnalysisRowData, "created_label" | "summary">[];
+  // Load with post details; fall back gracefully if the details database update isn't applied yet.
+  let hasDetails = true;
+  const query = (cols: string) =>
+    supabase.from("analyses").select(cols).order("created_at", { ascending: false }).limit(50);
+  type Result = { data: Record<string, unknown>[] | null; error: { message: string } | null };
+  let { data, error } = (await query(`${BASE_COLS}, ${DETAIL_COLS}`)) as unknown as Result;
+  if (error && /column|schema cache/i.test(error.message)) {
+    hasDetails = false;
+    ({ data, error } = (await query(BASE_COLS)) as unknown as Result);
+  }
+  const base = (data ?? []) as unknown as Omit<AnalysisRowData, "created_label" | "summary" | "has_details">[];
 
   // Real counts straight from the database for each finished analysis.
   const summaries = new Map<string, AnalysisRowData["summary"]>();
@@ -39,6 +49,7 @@ export default async function AnalyzePage() {
   const rows: AnalysisRowData[] = base.map((r) => ({
     ...r,
     summary: summaries.get(r.id) ?? null,
+    has_details: hasDetails,
     created_label: new Date(r.created_at).toLocaleString("en-IN", {
       dateStyle: "medium",
       timeStyle: "short",

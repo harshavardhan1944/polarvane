@@ -215,3 +215,43 @@ function hash(s: string) {
   for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
   return (h >>> 0).toString(36);
 }
+
+// ---------- Post details (caption, counts) via Apify's Instagram post tool ----------
+
+const POST_ACTOR = "apify~instagram-scraper";
+
+export type PostDetails = {
+  caption: string | null;
+  post_owner: string | null;
+  likes_count: number | null;
+  views_count: number | null;
+  comments_reported: number | null;
+  post_published_at: string | null;
+};
+
+// Runs the post tool and waits for the result (usually 20–60 seconds).
+export async function fetchPostDetails(postUrl: string): Promise<PostDetails | null> {
+  for (const resultsType of ["details", "posts"]) {
+    const items = await apifyFetch(
+      `/acts/${POST_ACTOR}/run-sync-get-dataset-items?timeout=120&maxItems=1&clean=true`,
+      {
+        method: "POST",
+        body: JSON.stringify({ directUrls: [postUrl], resultsType, resultsLimit: 1, addParentData: false }),
+      },
+    );
+    const item = (Array.isArray(items) ? items : []).find(
+      (i: Record<string, unknown>) => i && !i.error && (i.caption !== undefined || i.commentsCount !== undefined),
+    ) as Record<string, unknown> | undefined;
+    if (item) {
+      return {
+        caption: str(item.caption)?.slice(0, 4000) ?? null,
+        post_owner: str(item.ownerUsername),
+        likes_count: num(item.likesCount),
+        views_count: num(item.videoViewCount) ?? num(item.videoPlayCount) ?? num(item.playCount),
+        comments_reported: num(item.commentsCount),
+        post_published_at: toIso(item.timestamp),
+      };
+    }
+  }
+  return null;
+}
