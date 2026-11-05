@@ -156,7 +156,8 @@ export function AnalysisRow({ row }: { row: AnalysisRowData }) {
 
   const badge = BADGE[row.status];
   const Icon = row.post_type === "reel" ? Clapperboard : ImageIcon;
-  const canStart = row.status === "queued" || row.status === "failed";
+  const [recollect, setRecollect] = useState(false);
+  const canStart = row.status === "queued" || row.status === "failed" || (row.status === "completed" && recollect);
 
   return (
     <div className="p-4">
@@ -304,12 +305,29 @@ export function AnalysisRow({ row }: { row: AnalysisRowData }) {
 
       {row.status === "completed" && row.summary && <SentimentSummary s={row.summary} />}
       {row.status === "completed" && (
-        <a
-          href={`/api/export?analysis=${row.id}`}
-          className="mt-2 inline-flex items-center gap-1.5 text-xs text-brand-blue hover:underline"
-        >
-          <Download size={13} /> Download comments (CSV)
-        </a>
+        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+          <a
+            href={`/api/export?analysis=${row.id}`}
+            className="inline-flex items-center gap-1.5 text-xs text-brand-blue hover:underline"
+          >
+            <Download size={13} /> Download comments (CSV)
+          </a>
+          <button
+            onClick={() => {
+              setRecollect((v) => !v);
+              setConfirming(false);
+            }}
+            className="inline-flex items-center gap-1.5 text-xs text-brand-blue hover:underline"
+          >
+            <RotateCcw size={13} /> {recollect ? "Cancel collect more" : "Collect more (e.g. add replies)"}
+          </button>
+        </div>
+      )}
+      {row.status === "completed" && recollect && (
+        <p className="mt-2 text-xs text-muted">
+          Choose a new option below. Comments you already have are kept; only new ones are added and analyzed, so you
+          don’t pay the AI twice. Apify charges for everything it collects in the new run.
+        </p>
       )}
 
       {canStart && (
@@ -345,7 +363,7 @@ export function AnalysisRow({ row }: { row: AnalysisRowData }) {
                 className="brand-gradient inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
               >
                 {row.status === "failed" ? <RotateCcw size={13} /> : <Download size={13} />}
-                {row.status === "failed" ? "Try again" : "Collect comments"}
+                {row.status === "failed" ? "Try again" : row.status === "completed" ? "Collect more" : "Collect comments"}
               </button>
             ) : (
               <>

@@ -110,7 +110,7 @@ export async function startCollection(id: string, limit: number): Promise<Collec
     .eq("id", id)
     .maybeSingle();
   if (!analysis) return { ok: false, message: "Post not found." };
-  if (!["queued", "failed"].includes(analysis.status))
+  if (!["queued", "failed", "completed"].includes(analysis.status))
     return { ok: false, message: "This post is already being processed." };
 
   // Protect against accidental runaway costs: limit parallel jobs per user.
@@ -126,7 +126,7 @@ export async function startCollection(id: string, limit: number): Promise<Collec
     .from("analyses")
     .update({ status: "collecting", comment_limit: limit, error_message: null, apify_run_id: null })
     .eq("id", id)
-    .in("status", ["queued", "failed"])
+    .in("status", ["queued", "failed", "completed"])
     .select("id");
   if (!claimed || claimed.length === 0) return { ok: false, message: "This post is already being processed." };
 
