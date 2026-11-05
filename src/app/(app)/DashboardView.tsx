@@ -92,7 +92,15 @@ export function DashboardView({
             .
           </p>
         </div>
-        <PostFilter posts={posts} value={selected} />
+        <div className="flex items-center gap-2">
+          <PostFilter posts={posts} value={selected} />
+          <a
+            href={`/api/export${selected ? `?analysis=${selected}` : ""}`}
+            className="rounded-lg border border-navy-600 bg-navy-900/60 px-3 py-2 text-sm text-muted hover:text-ink"
+          >
+            Export CSV
+          </a>
+        </div>
       </header>
 
       {notice && <div className="panel mb-4 p-3 text-xs text-amber-200">{notice}</div>}

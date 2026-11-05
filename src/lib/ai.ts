@@ -83,6 +83,8 @@ For EACH comment, decide:
 3. topics: 0–3 short lowercase themes that the comment ACTUALLY talks about.
    Prefer these when they fit: ${CORE_TOPICS.join(", ")}.
    If a clearly different theme appears, you may use a new short theme (1–3 words, lowercase).
+   If a comment names a specific product or product line (e.g. a range name), include that name as a topic.
+   For product feedback, prefer concrete aspects people discuss (e.g. "colour result", "damage", "price", "smell", "salon experience").
    Use an empty list if no theme is clear (e.g. a lone emoji).
 
 Rules:

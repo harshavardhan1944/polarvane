@@ -217,6 +217,14 @@ export function AnalysisRow({ row }: { row: AnalysisRowData }) {
       )}
 
       {row.status === "completed" && row.summary && <SentimentSummary s={row.summary} />}
+      {row.status === "completed" && (
+        <a
+          href={`/api/export?analysis=${row.id}`}
+          className="mt-2 inline-flex items-center gap-1.5 text-xs text-brand-blue hover:underline"
+        >
+          <Download size={13} /> Download comments (CSV)
+        </a>
+      )}
 
       {canStart && (
         <div className="mt-3 flex flex-col gap-3 rounded-lg border border-navy-700 bg-navy-900/60 p-3 sm:flex-row sm:items-center">
