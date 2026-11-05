@@ -233,7 +233,7 @@ export type PostDetails = {
 export async function fetchPostDetails(postUrl: string): Promise<PostDetails | null> {
   for (const resultsType of ["details", "posts"]) {
     const items = await apifyFetch(
-      `/acts/${POST_ACTOR}/run-sync-get-dataset-items?timeout=120&maxItems=1&clean=true`,
+      `/acts/${POST_ACTOR}/run-sync-get-dataset-items?timeout=120&maxTotalChargeUsd=0.05&clean=true`,
       {
         method: "POST",
         body: JSON.stringify({ directUrls: [postUrl], resultsType, resultsLimit: 1, addParentData: false }),
