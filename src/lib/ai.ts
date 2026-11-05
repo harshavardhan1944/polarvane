@@ -188,8 +188,14 @@ export async function geminiJson(req: GeminiRequest): Promise<unknown> {
     if (res.status === 401 || res.status === 403)
       throw new AiError(`The Gemini key was rejected. Check GEMINI_API_KEY in Vercel.${detail}`, "auth");
     if (res.status === 429)
-      throw new AiError("Free AI limit reached for the moment. Please wait a minute and try again.", "busy");
-    if (res.status >= 500) throw new AiError("Google’s free AI service is very busy right now. Please wait a minute and try again.", "busy");
+      throw new AiError(
+        /per day|PerDay|daily/i.test(body)
+          ? `Today’s free Gemini limit is used up. It resets daily (around 1:30 pm India time).${detail} (429)`
+          : `Free Gemini limit reached for the moment. Please wait a minute and try again.${detail} (429)`,
+        "busy",
+      );
+    if (res.status >= 500)
+      throw new AiError(`Google’s AI service is busy right now. Please wait a minute and try again.${detail} (${res.status})`, "busy");
     throw new AiError(`The AI service returned an error (${res.status}).${detail}`, "other");
   }
 
