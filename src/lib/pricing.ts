@@ -2,11 +2,17 @@
 // 1,000 comments (a little higher on the free plan). Estimates only — the real
 // charge is shown in your Apify billing page.
 export const APIFY_PRICE_PER_1000_USD = { low: 2.3, high: 2.7 };
-export const ALL_COMMENTS = 5000; // "All comments": every comment + replies, capped for cost safety
-export const COMMENT_LIMITS = [50, 200, 500, 1000, ALL_COMMENTS] as const;
+// "All" options are capped for cost safety. Two distinct values so we know whether to include replies.
+export const ALL_COMMENTS = 5000; // every comment + replies
+export const ALL_TOP_LEVEL = 4999; // every comment, no replies
+export const COMMENT_LIMITS = [50, 200, 500, 1000, ALL_TOP_LEVEL, ALL_COMMENTS] as const;
+
+export const isAllOption = (n: number) => n === ALL_COMMENTS || n === ALL_TOP_LEVEL;
 
 export function limitLabel(n: number) {
-  return n === ALL_COMMENTS ? "All comments + replies (max 5,000)" : `${n.toLocaleString()} comments`;
+  if (n === ALL_COMMENTS) return "All comments + replies (max 5,000)";
+  if (n === ALL_TOP_LEVEL) return "All comments, no replies (max 5,000)";
+  return `${n.toLocaleString()} comments`;
 }
 
 export function estimateApifyCost(comments: number) {

@@ -12,7 +12,7 @@ import {
   RotateCcw,
   Trash2,
 } from "lucide-react";
-import { ALL_COMMENTS, COMMENT_LIMITS, estimateApifyCost, limitLabel } from "@/lib/pricing";
+import { COMMENT_LIMITS, estimateApifyCost, isAllOption, limitLabel } from "@/lib/pricing";
 import { SentimentBar, SentimentLegend } from "@/components/charts";
 import { analyzeNextBatch, checkCollection, deleteAnalysis, startCollection } from "./actions";
 
@@ -247,7 +247,7 @@ export function AnalysisRow({ row }: { row: AnalysisRowData }) {
             </select>
           </label>
           <span className="text-xs text-faint">
-            {limit === ALL_COMMENTS
+            {isAllOption(limit)
               ? "You pay only for comments actually collected: about $2.30–2.70 per 1,000 (e.g. ~1,100 comments ≈ $2.50–3.00)"
               : `Estimated Apify cost: about ${estimateApifyCost(limit)}`}
           </span>
@@ -276,7 +276,7 @@ export function AnalysisRow({ row }: { row: AnalysisRowData }) {
                   className="brand-gradient inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
                 >
                   {pending && <Loader2 size={13} className="animate-spin" />}
-                  Confirm · {limit === ALL_COMMENTS ? "max $13.50" : `up to ${estimateApifyCost(limit).split("–")[1]}`}
+                  Confirm · {isAllOption(limit) ? "max $13.50" : `up to ${estimateApifyCost(limit).split("–")[1]}`}
                 </button>
               </>
             )}
