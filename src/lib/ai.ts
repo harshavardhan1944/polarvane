@@ -158,13 +158,22 @@ export async function geminiJson(req: GeminiRequest): Promise<unknown> {
   let res: Response | null = null;
   let body = "";
 
-  for (const model of MODELS) {
-    res = await callGemini(model, key, req);
-    if (res.ok) break;
-    body = await res.text().catch(() => "");
-    console.error(`[polarvane] Gemini ${model} ${res.status}:`, body.slice(0, 500));
-    // Only try the next model if this one doesn't exist / is retired.
-    if (res.status !== 404 && !/no longer available|not found|not supported/i.test(body)) break;
+  // Try each model; on a temporary error (busy/overloaded/rate-limited) wait
+  // briefly and retry, then fall back to the next model.
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  outer: for (const model of MODELS) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      res = await callGemini(model, key, req);
+      if (res.ok) break outer;
+      body = await res.text().catch(() => "");
+      console.error(`[polarvane] Gemini ${model} attempt ${attempt + 1} ${res.status}:`, body.slice(0, 300));
+      const temporary = res.status === 429 || res.status >= 500;
+      const retired = res.status === 404 || /no longer available|not found|not supported/i.test(body);
+      if (retired) continue outer; // model gone: go to the next one
+      if (!temporary) break outer; // real error (e.g. bad key): stop
+      if (attempt === 0) await sleep(1500); // brief pause, then retry same model
+    }
+    // still busy after a retry: fall through to the next model
   }
   if (!res) throw new AiError("No AI model configured.", "other");
 
@@ -180,7 +189,7 @@ export async function geminiJson(req: GeminiRequest): Promise<unknown> {
       throw new AiError(`The Gemini key was rejected. Check GEMINI_API_KEY in Vercel.${detail}`, "auth");
     if (res.status === 429)
       throw new AiError("Free AI limit reached for the moment. Please wait a minute and try again.", "busy");
-    if (res.status >= 500) throw new AiError("The AI service is busy. Please try again shortly.", "busy");
+    if (res.status >= 500) throw new AiError("Google’s free AI service is very busy right now. Please wait a minute and try again.", "busy");
     throw new AiError(`The AI service returned an error (${res.status}).${detail}`, "other");
   }
 

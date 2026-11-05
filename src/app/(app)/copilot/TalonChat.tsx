@@ -15,7 +15,7 @@ export type TalonSummary = {
 export type Message =
   | { role: "user"; text: string }
   | { role: "talon"; text: string; evidence: TalonEvidence[]; total: number; sampled: boolean }
-  | { role: "error"; text: string };
+  | { role: "error"; text: string; question?: string };
 
 const SUGGESTION_GROUPS = [
   {
@@ -83,10 +83,10 @@ export function TalonChat({
           ...m,
           r.ok
             ? { role: "talon", text: r.answer, evidence: r.evidence, total: r.total, sampled: r.sampled }
-            : { role: "error", text: r.message },
+            : { role: "error", text: r.message, question: q },
         ]);
       } catch {
-        setMessages((m) => [...m, { role: "error", text: "Lost connection. Please try again." }]);
+        setMessages((m) => [...m, { role: "error", text: "Lost connection. Please try again.", question: q }]);
       }
     });
   }
@@ -171,9 +171,24 @@ export function TalonChat({
                 </p>
               </div>
             ) : m.role === "error" ? (
-              <p key={i} className="flex items-start gap-2 rounded-xl border border-negative/30 bg-negative/10 p-3 text-sm text-red-200">
-                <AlertCircle size={16} className="mt-0.5 shrink-0" /> {m.text}
-              </p>
+              <div key={i} className="flex items-start gap-2 rounded-xl border border-negative/30 bg-negative/10 p-3 text-sm text-red-200">
+                <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                <span className="flex-1">{m.text}</span>
+                {m.question && i === messages.length - 1 && (
+                  <button
+                    onClick={() => {
+                      const q = m.question!;
+                      // remove the failed question + error, then ask again
+                      setMessages((all) => all.slice(0, -2));
+                      setTimeout(() => ask(q), 0);
+                    }}
+                    disabled={pending}
+                    className="shrink-0 rounded-md border border-red-300/30 px-2.5 py-1 text-xs text-red-100 hover:bg-red-400/10 disabled:opacity-50"
+                  >
+                    Try again
+                  </button>
+                )}
+              </div>
             ) : (
               <div key={i} className="flex gap-3">
                 <span className="brand-gradient mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl">
