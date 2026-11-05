@@ -57,6 +57,7 @@ export function AnalysisRow({ row }: { row: AnalysisRowData }) {
 
   // Fetch the post's caption and counts once, automatically.
   const [detailsMsg, setDetailsMsg] = useState<string | null>(null);
+  const [showCaption, setShowCaption] = useState(false);
   const [detailsBusy, setDetailsBusy] = useState(false);
   const detailsAsked = useRef(false);
   async function getDetails() {
@@ -210,7 +211,21 @@ export function AnalysisRow({ row }: { row: AnalysisRowData }) {
           {row.details_status === "done" ? (
             <>
               {row.caption && (
-                <p className="line-clamp-3 whitespace-pre-line text-xs leading-relaxed text-muted">{row.caption}</p>
+                <>
+                  <p
+                    className={`whitespace-pre-line text-xs leading-relaxed text-muted ${showCaption ? "" : "line-clamp-3"}`}
+                  >
+                    {row.caption}
+                  </p>
+                  {row.caption.length > 160 && (
+                    <button
+                      onClick={() => setShowCaption((v) => !v)}
+                      className="mt-1 text-[11px] text-brand-blue hover:underline"
+                    >
+                      {showCaption ? "Show less" : "Show more"}
+                    </button>
+                  )}
+                </>
               )}
               <p className="num mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-faint">
                 {row.post_owner && <span>by @{row.post_owner}</span>}
