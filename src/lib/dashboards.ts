@@ -9,3 +9,14 @@ export async function listDashboards(supabase: SupabaseClient): Promise<Dashboar
   if (error) return null;
   return (data ?? []) as DashboardItem[];
 }
+
+// Your own names for posts (id → title). Empty if the titles database update isn't applied yet.
+export async function loadPostTitles(supabase: SupabaseClient): Promise<Map<string, string>> {
+  const { data, error } = await supabase.from("analyses").select("id, title").not("title", "is", null);
+  if (error) return new Map();
+  return new Map((data ?? []).map((r) => [r.id as string, r.title as string]));
+}
+
+export function postLabel(p: { id: string; post_type: string; shortcode: string }, titles: Map<string, string>) {
+  return titles.get(p.id) ?? `${p.post_type === "reel" ? "Reel" : "Post"} · ${p.shortcode}`;
+}

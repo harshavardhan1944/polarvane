@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/NotBuiltYet";
 import { DashboardSwitcher } from "@/components/DashboardSwitcher";
-import { listDashboards } from "@/lib/dashboards";
+import { listDashboards, loadPostTitles, postLabel } from "@/lib/dashboards";
 import { computeInsights, loadComments } from "@/lib/insights";
 import { createClient } from "@/lib/supabase/server";
 import { listChats, loadChat, type StoredMessage } from "./actions";
@@ -22,12 +22,10 @@ export default async function CopilotPage(props: PageProps<"/copilot">) {
     supabase.from("analyses").select(cols).eq("status", "completed").order("created_at", { ascending: false });
   const first = (await pq("id, shortcode, post_type, dashboard_id")) as unknown as R;
   const data = first.error ? ((await pq("id, shortcode, post_type")) as unknown as R).data : first.data;
+  const titles = await loadPostTitles(supabase);
   const posts = (data ?? [])
     .filter((a) => !current || a.dashboard_id === current)
-    .map((a) => ({
-      id: a.id,
-      label: `${a.post_type === "reel" ? "Reel" : "Post"} · ${a.shortcode}`,
-    }));
+    .map((a) => ({ id: a.id, label: postLabel(a, titles) }));
   const switcher = <DashboardSwitcher dashboards={dashboards} current={current} basePath="/copilot" />;
 
   if (posts.length === 0) {

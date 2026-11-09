@@ -9,6 +9,7 @@ import {
   ExternalLink,
   ImageIcon,
   Loader2,
+  Pencil,
   RotateCcw,
   Sparkles,
   Trash2,
@@ -22,6 +23,7 @@ import {
   deleteAnalysis,
   fetchDetails,
   reanalyze,
+  renamePost,
   rereadLastRun,
   startCollection,
 } from "./actions";
@@ -40,6 +42,7 @@ export type AnalysisRowData = {
   summary: { positive: number; neutral: number; negative: number; failed: number } | null;
   has_details: boolean;
   dashboards: { id: string; name: string }[] | null;
+  title?: string | null;
   dashboard_id?: string | null;
   caption?: string | null;
   post_owner?: string | null;
@@ -70,6 +73,8 @@ export function AnalysisRow({ row }: { row: AnalysisRowData }) {
   // Fetch the post's caption and counts once, automatically.
   const [detailsMsg, setDetailsMsg] = useState<string | null>(null);
   const [showCaption, setShowCaption] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
   const [detailsBusy, setDetailsBusy] = useState(false);
   const detailsAsked = useRef(false);
   async function getDetails() {
@@ -179,15 +184,59 @@ export function AnalysisRow({ row }: { row: AnalysisRowData }) {
             <Icon size={16} className="text-brand-blue" />
           </div>
           <div className="min-w-0">
-            <a
-              href={row.post_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 truncate text-sm hover:text-brand-blue"
-            >
-              {row.post_type === "reel" ? "Reel" : "Post"} · {row.shortcode}
-              <ExternalLink size={12} className="shrink-0 text-faint" />
-            </a>
+            {editingTitle ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  startTransition(async () => {
+                    const r = await renamePost(row.id, titleDraft);
+                    if (!r.ok && r.message) setMessage(r.message);
+                    setEditingTitle(false);
+                    router.refresh();
+                  });
+                }}
+                className="flex items-center gap-1.5"
+              >
+                <input
+                  autoFocus
+                  value={titleDraft}
+                  onChange={(e) => setTitleDraft(e.target.value)}
+                  maxLength={120}
+                  placeholder="e.g. Collaboration reel with Nitish Yadav"
+                  aria-label="Post name"
+                  className="w-64 rounded-md border border-brand-blue/60 bg-navy-900 px-2 py-1 text-sm outline-none sm:w-80"
+                />
+                <button type="submit" disabled={pending} className="brand-gradient rounded-md px-2.5 py-1 text-xs font-medium text-white">
+                  Save
+                </button>
+                <button type="button" onClick={() => setEditingTitle(false)} className="px-1 text-xs text-muted hover:text-ink">
+                  Cancel
+                </button>
+              </form>
+            ) : (
+              <div className="flex items-center gap-2">
+                <a
+                  href={row.post_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 truncate text-sm hover:text-brand-blue"
+                >
+                  {row.title || `${row.post_type === "reel" ? "Reel" : "Post"} · ${row.shortcode}`}
+                  <ExternalLink size={12} className="shrink-0 text-faint" />
+                </a>
+                <button
+                  onClick={() => {
+                    setTitleDraft(row.title ?? "");
+                    setEditingTitle(true);
+                  }}
+                  title="Rename this post"
+                  aria-label="Rename this post"
+                  className="rounded p-1 text-faint hover:text-ink"
+                >
+                  <Pencil size={12} />
+                </button>
+              </div>
+            )}
             <p className="text-xs text-faint">
               Added {row.created_label}
               {row.comments_collected > 0 &&

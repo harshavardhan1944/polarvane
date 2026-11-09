@@ -1,5 +1,5 @@
 import { DashboardSwitcher } from "@/components/DashboardSwitcher";
-import { listDashboards } from "@/lib/dashboards";
+import { listDashboards, loadPostTitles, postLabel } from "@/lib/dashboards";
 import { computeInsights, keyInsights, loadComments, type CommentRow } from "@/lib/insights";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardEmpty, DashboardView } from "./DashboardView";
@@ -25,9 +25,10 @@ export default async function DashboardPage(props: PageProps<"/">) {
     ({ data: analyses, error } = (await q("id, shortcode, post_type")) as unknown as R);
   }
 
+  const titles = await loadPostTitles(supabase);
   const posts = (analyses ?? [])
     .filter((a) => !current || a.dashboard_id === current)
-    .map((a) => ({ id: a.id, label: `${a.post_type === "reel" ? "Reel" : "Post"} · ${a.shortcode}` }));
+    .map((a) => ({ id: a.id, label: postLabel(a, titles) }));
   const selected = typeof sp.post === "string" && posts.some((p) => p.id === sp.post) ? sp.post : "";
 
   const switcher = <DashboardSwitcher dashboards={dashboards} current={current} />;

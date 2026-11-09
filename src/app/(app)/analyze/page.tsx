@@ -1,6 +1,6 @@
 import { PageHeader } from "@/components/NotBuiltYet";
 import { DashboardSwitcher } from "@/components/DashboardSwitcher";
-import { listDashboards } from "@/lib/dashboards";
+import { listDashboards, loadPostTitles } from "@/lib/dashboards";
 import { createClient } from "@/lib/supabase/server";
 import { AnalysisRow, type AnalysisRowData } from "./AnalysisRow";
 import { NewAnalysisForm } from "./NewAnalysisForm";
@@ -60,7 +60,9 @@ export default async function AnalyzePage(props: PageProps<"/analyze">) {
       }),
   );
 
+  const titles = await loadPostTitles(supabase);
   const rows: AnalysisRowData[] = base.map((r) => ({
+    title: titles.get(r.id) ?? null,
     ...r,
     summary: summaries.get(r.id) ?? null,
     has_details: hasDetails,

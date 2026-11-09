@@ -425,3 +425,26 @@ export async function reanalyze(id: string): Promise<CollectionResult> {
   refresh();
   return { ok: true, status: "analyzing" };
 }
+
+export async function renamePost(id: string, title: string): Promise<{ ok: boolean; message?: string }> {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return { ok: false, message: "Invalid request." };
+  const clean = (title ?? "").replace(/\s+/g, " ").trim().slice(0, 120);
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "Your session has expired. Please sign in again." };
+  const { error } = await supabase
+    .from("analyses")
+    .update({ title: clean || null })
+    .eq("id", id);
+  if (error)
+    return {
+      ok: false,
+      message: /title|schema cache/i.test(error.message)
+        ? "Post names need the database update (part 7) in Supabase."
+        : "Couldn’t rename the post.",
+    };
+  refresh();
+  return { ok: true };
+}
