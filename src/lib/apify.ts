@@ -260,3 +260,23 @@ export async function fetchPostDetails(postUrl: string): Promise<PostDetails | n
   }
   return null;
 }
+
+// ---------- Generic: run any Apify tool and wait for its results ----------
+
+// Used by "Find sources" (Google Maps, Amazon). maxUsd caps what one run can cost.
+export async function runActorSync(
+  actor: string,
+  input: Record<string, unknown>,
+  { timeoutSecs = 150, maxUsd = 0.2 }: { timeoutSecs?: number; maxUsd?: number } = {},
+): Promise<Record<string, unknown>[]> {
+  const id = actor.trim().replace("/", "~");
+  const items = await apifyFetch(
+    `/acts/${id}/run-sync-get-dataset-items?timeout=${timeoutSecs}&maxTotalChargeUsd=${maxUsd}&clean=true`,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+  return Array.isArray(items) ? (items as Record<string, unknown>[]) : [];
+}
+
+export function isApifyConfigured() {
+  return Boolean((process.env.APIFY_TOKEN ?? "").trim());
+}
