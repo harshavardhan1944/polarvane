@@ -9,6 +9,7 @@ import {
   MessageSquareText,
   Sparkles,
   Plug,
+  Radar,
   Menu,
   X,
 } from "lucide-react";
@@ -26,6 +27,7 @@ const NAV_GROUPS = [
   {
     label: "Data",
     items: [
+      { href: "/sources", label: "Find sources", icon: Radar },
       { href: "/analyze", label: "Analyze a post", icon: Link2 },
       { href: "/integrations", label: "Integrations", icon: Plug },
     ],
