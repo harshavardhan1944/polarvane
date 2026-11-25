@@ -7,7 +7,7 @@ import { maskMentions } from "./privacy";
 
 const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 // Override with the GEMINI_MODEL setting if Google renames models.
-const MODELS = [
+export const MODELS = [
   process.env.GEMINI_MODEL?.trim(),
   "gemini-3.5-flash-lite",
   "gemini-3.5-flash",
@@ -57,7 +57,7 @@ export type CommentResult = {
   topics: string[];
 };
 
-function apiKey() {
+export function apiKey() {
   const k = (process.env.GEMINI_API_KEY ?? "")
     .replace(/[​-‍﻿ ]/g, "")
     .replace(/^\s*GEMINI_API_KEY\s*=/, "")
@@ -123,7 +123,7 @@ const RESPONSE_SCHEMA = {
 
 // We are classifying (not generating) possibly rude comments, so don't let
 // safety filters silently drop the whole batch.
-const SAFETY = [
+export const SAFETY = [
   "HARM_CATEGORY_HARASSMENT",
   "HARM_CATEGORY_HATE_SPEECH",
   "HARM_CATEGORY_SEXUALLY_EXPLICIT",

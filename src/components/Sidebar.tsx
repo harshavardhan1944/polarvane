@@ -9,6 +9,7 @@ import {
   MessageSquareText,
   Sparkles,
   Plug,
+  Radar,
   Menu,
   X,
 } from "lucide-react";
@@ -21,6 +22,7 @@ const NAV_GROUPS = [
       { href: "/", label: "Dashboard", icon: LayoutDashboard },
       { href: "/copilot", label: "Talon copilot", icon: Sparkles },
       { href: "/comments", label: "Comments", icon: MessageSquareText },
+      { href: "/ai-visibility", label: "AI visibility", icon: Radar },
     ],
   },
   {
