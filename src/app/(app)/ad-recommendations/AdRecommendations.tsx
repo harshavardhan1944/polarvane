@@ -8,6 +8,7 @@ import { makeBrief } from "./actions";
 export type PostCard = PostSignals & { label: string; views: number | null; likes: number | null };
 
 const pct = (v: number | null) => (v === null ? "—" : `${Math.round(v * 100)}%`);
+const comments = (n: number) => `about ${n} comment${n === 1 ? "" : "s"}`;
 const num = (v: number | null) => (v === null ? "—" : new Intl.NumberFormat("en-IN", { notation: "compact" }).format(v));
 
 function Badge({ post, isTop, minComments }: { post: PostCard; isTop: boolean; minComments: number }) {
@@ -75,7 +76,7 @@ function briefToText(brief: AdBrief, posts: string[]) {
     lines.push("");
   };
   block("Hook ideas", brief.hooks);
-  block("Doubts to answer", brief.doubts, (i) => `about ${brief.doubts[i].mentions} comments`);
+  block("Doubts to answer", brief.doubts, (i) => comments(brief.doubts[i].mentions));
   block("What to show", brief.show);
   block("What to avoid", brief.avoid);
   if (brief.verify.length) {
@@ -194,10 +195,15 @@ export function AdRecommendations({ posts, minComments }: { posts: PostCard[]; m
           <div>
             <h2 className="font-display text-xl">Ad brief</h2>
             <p className="mt-1 text-xs text-faint">Written from {brief.commentsUsed} real comments. Every point shows the comments behind it.</p>
+            {brief.commentsUsed < 60 && (
+              <p className="mt-2 text-xs text-amber-200/90">
+                Based on only {brief.commentsUsed} comments. Select 2–3 posts together for a stronger brief.
+              </p>
+            )}
             {brief.summary && <p className="mt-3 text-sm text-muted">{brief.summary}</p>}
           </div>
           <Section title="Hook ideas" items={brief.hooks} />
-          <Section title="Doubts to answer in the ad" items={brief.doubts} extra={(i) => `about ${brief.doubts[i].mentions} comments`} />
+          <Section title="Doubts to answer in the ad" items={brief.doubts} extra={(i) => comments(brief.doubts[i].mentions)} />
           <Section title="What to show" items={brief.show} />
           <Section title="What to avoid" items={brief.avoid} />
           {brief.verify.length > 0 && (
