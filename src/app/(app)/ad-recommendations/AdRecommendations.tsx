@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { AlertCircle, Download, Loader2, Megaphone, Quote } from "lucide-react";
+import { AlertCircle, Download, Loader2, Megaphone, Quote, ShieldCheck } from "lucide-react";
 import type { AdBrief, BriefItem, PostSignals } from "@/lib/adbrief";
-import { makeBrief } from "./actions";
+import type { CopyCheck, CopyStatus } from "@/lib/copycheck";
+import { checkCopy, makeBrief } from "./actions";
 
 export type PostCard = PostSignals & { label: string; views: number | null; likes: number | null };
 
@@ -86,6 +87,128 @@ function briefToText(brief: AdBrief, posts: string[]) {
   }
   lines.push("Comment signals suggest what to test; only the ad results show what works.");
   return lines.join("\n");
+}
+
+const STATUS: Record<CopyStatus, { label: string; cls: string }> = {
+  doubted: { label: "Customers doubt this", cls: "border-red-400/40 bg-red-400/10 text-red-300" },
+  needs_proof: { label: "Needs proof", cls: "border-amber-400/40 bg-amber-400/10 text-amber-200" },
+  supported: { label: "Customers agree", cls: "border-emerald-400/40 bg-emerald-400/10 text-emerald-300" },
+  ok: { label: "Fine", cls: "border-navy-600 text-muted" },
+};
+const ORDER: CopyStatus[] = ["doubted", "needs_proof", "supported", "ok"];
+
+function CopyChecker({ selected }: { selected: string[] }) {
+  const [copy, setCopy] = useState("");
+  const [result, setResult] = useState<CopyCheck | null>(null);
+  const [error, setError] = useState("");
+  const [pending, start] = useTransition();
+
+  function run() {
+    setError("");
+    if (copy.trim().length < 5) return setError("Paste the ad text you want to check.");
+    if (selected.length === 0) return setError("Tick at least one post above to check against.");
+    start(async () => {
+      const res = await checkCopy(selected, copy);
+      if (!res.ok) {
+        setResult(null);
+        return setError(res.message);
+      }
+      setResult(res.check);
+    });
+  }
+
+  const flags = result ? [...result.flags].sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status)) : [];
+  const counts = result
+    ? ORDER.map((s) => [s, result.flags.filter((f) => f.status === s).length] as const).filter(([, n]) => n > 0)
+    : [];
+
+  return (
+    <section className="panel space-y-4 p-5 sm:p-6">
+      <div>
+        <h2 className="flex items-center gap-2 font-display text-xl">
+          <ShieldCheck size={18} /> Ad copy checker
+        </h2>
+        <p className="mt-1 text-xs text-faint">
+          Paste a draft ad. Each line is checked against real comments on the ticked posts ({selected.length}).
+        </p>
+      </div>
+      <textarea
+        value={copy}
+        onChange={(e) => setCopy(e.target.value)}
+        rows={4}
+        maxLength={2000}
+        placeholder="e.g. Lightweight SPF 50 for every skin type. No white cast, no breakouts. Shop now."
+        className="w-full rounded-lg border border-navy-600 bg-navy-900 p-3 text-sm outline-none focus:border-brand-blue/60"
+      />
+      <button
+        onClick={run}
+        disabled={pending}
+        className="inline-flex items-center gap-2 rounded-lg border border-navy-600 px-4 py-2 text-sm hover:bg-navy-800 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {pending ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
+        {pending ? "Checking…" : "Check this ad"}
+      </button>
+      {error && (
+        <p className="flex items-start gap-1.5 text-xs text-red-300">
+          <AlertCircle size={13} className="mt-0.5 shrink-0" /> {error}
+        </p>
+      )}
+
+      {result && (
+        <div className="space-y-4">
+          <div className="rounded-lg border border-navy-700 bg-navy-900 p-3">
+            <p className="text-sm">{result.verdict}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {counts.map(([s, n]) => (
+                <span key={s} className={`rounded-full border px-2 py-0.5 text-[11px] ${STATUS[s].cls}`}>
+                  {n} · {STATUS[s].label}
+                </span>
+              ))}
+            </div>
+            <p className="mt-2 text-[11px] text-faint">Checked against {result.commentsUsed} comments.</p>
+          </div>
+          <ul className="space-y-3">
+            {flags.map((f, i) => (
+              <li key={`${f.line}-${i}`} className="rounded-lg border border-navy-700 bg-navy-900 p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-medium">“{f.line}”</p>
+                  <span className={`rounded-full border px-2 py-0.5 text-[11px] ${STATUS[f.status].cls}`}>
+                    {STATUS[f.status].label}
+                  </span>
+                  {f.mentions > 0 && <span className="text-xs text-faint">{comments(f.mentions)}</span>}
+                </div>
+                {f.why && <p className="mt-1 text-xs text-muted">{f.why}</p>}
+                {f.suggestion && f.status !== "ok" && (
+                  <p className="mt-1 text-xs text-ink">
+                    <b>Suggestion:</b> {f.suggestion}
+                  </p>
+                )}
+                <Evidence items={f.evidence} />
+              </li>
+            ))}
+          </ul>
+          {result.missing.length > 0 && (
+            <div>
+              <h3 className="mb-2 text-sm font-medium">Doubts this ad doesn’t answer</h3>
+              <ul className="space-y-3">
+                {result.missing.map((m) => (
+                  <li key={m.text} className="rounded-lg border border-navy-700 bg-navy-900 p-3">
+                    <p className="text-sm">
+                      {m.text} <span className="text-xs text-faint">· {comments(m.mentions)}</span>
+                    </p>
+                    <Evidence items={m.evidence} />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <p className="text-[11px] text-faint">
+            Polarvane checks what customers say, not whether a claim is true. Confirm every product claim before running the ad.
+          </p>
+        </div>
+      )}
+    </section>
+  );
 }
 
 export function AdRecommendations({ posts, minComments }: { posts: PostCard[]; minComments: number }) {
@@ -218,6 +341,7 @@ export function AdRecommendations({ posts, minComments }: { posts: PostCard[]; m
           )}
         </section>
       )}
+      <CopyChecker selected={selected} />
     </div>
   );
 }
