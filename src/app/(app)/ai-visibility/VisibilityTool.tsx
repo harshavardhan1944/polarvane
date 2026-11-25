@@ -8,6 +8,15 @@ import { deleteRun, runCheck, suggestFromComments, type CheckRow } from "./actio
 
 const MAX_QUESTIONS = 10;
 
+// "L'Oréal Professionnel" and "L'Oreal Professionnel" -> same key.
+function brandKey(name: string) {
+  return name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
 const inputCls =
   "w-full rounded-lg border border-navy-700 bg-navy-900 px-3 py-2.5 text-sm outline-none placeholder:text-faint focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/25";
 
@@ -82,9 +91,20 @@ function ResultRow({ row }: { row: CheckRow }) {
 
 function Score({ rows, brand }: { rows: CheckRow[]; brand: string }) {
   const hits = rows.filter((r) => r.mentioned).length;
-  const competitors = new Map<string, number>();
-  rows.forEach((r) => r.competitors.forEach((c) => competitors.set(c, (competitors.get(c) ?? 0) + 1)));
-  const top = [...competitors.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+  // Count each brand once per answer, treating "L'Oréal" and "L'Oreal" as the same name.
+  const competitors = new Map<string, { name: string; n: number }>();
+  rows.forEach((r) => {
+    const seen = new Set<string>();
+    r.competitors.forEach((c) => {
+      const key = brandKey(c);
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      const cur = competitors.get(key);
+      const name = cur && /[^\x00-\x7f]/.test(cur.name) ? cur.name : c; // prefer the accented spelling
+      competitors.set(key, { name, n: (cur?.n ?? 0) + 1 });
+    });
+  });
+  const top = [...competitors.values()].sort((a, b) => b.n - a.n).slice(0, 5).map((c) => [c.name, c.n] as const);
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <div className="stat-card p-4">
