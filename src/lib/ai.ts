@@ -139,7 +139,8 @@ function normaliseTopic(t: string) {
     .slice(0, 40);
 }
 
-type GeminiRequest = { system: string; user: string; schema: object; temperature?: number };
+// media: extra parts sent before the text, e.g. an uploaded video { file_data: { mime_type, file_uri } }.
+type GeminiRequest = { system: string; user: string; schema: object; temperature?: number; media?: object[] };
 
 async function callGemini(model: string, key: string, req: GeminiRequest) {
   try {
@@ -148,7 +149,7 @@ async function callGemini(model: string, key: string, req: GeminiRequest) {
       headers: { "x-goog-api-key": key, "content-type": "application/json" },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: req.system }] },
-        contents: [{ role: "user", parts: [{ text: req.user }] }],
+        contents: [{ role: "user", parts: [...(req.media ?? []), { text: req.user }] }],
         generationConfig: {
           temperature: req.temperature ?? 0,
           responseMimeType: "application/json",

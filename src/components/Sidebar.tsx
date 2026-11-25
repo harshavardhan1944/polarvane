@@ -11,6 +11,7 @@ import {
   Plug,
   Radar,
   Megaphone,
+  MessageSquareReply,
   Menu,
   X,
 } from "lucide-react";
@@ -25,6 +26,7 @@ const NAV_GROUPS = [
       { href: "/comments", label: "Comments", icon: MessageSquareText },
       { href: "/ai-visibility", label: "AI visibility", icon: Radar },
       { href: "/ad-recommendations", label: "Ad recommendations", icon: Megaphone },
+      { href: "/reply-helper", label: "Reply helper", icon: MessageSquareReply },
     ],
   },
   {

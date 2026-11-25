@@ -5,6 +5,7 @@ import { AlertCircle, Download, Loader2, Megaphone, Quote, ShieldCheck } from "l
 import type { AdBrief, BriefItem, PostSignals } from "@/lib/adbrief";
 import type { CopyCheck, CopyStatus } from "@/lib/copycheck";
 import { checkCopy, makeBrief } from "./actions";
+import { VideoChecker } from "./VideoChecker";
 
 export type PostCard = PostSignals & { label: string; views: number | null; likes: number | null };
 
@@ -341,6 +342,7 @@ export function AdRecommendations({ posts, minComments }: { posts: PostCard[]; m
           )}
         </section>
       )}
+      <VideoChecker selected={selected} />
       <CopyChecker selected={selected} />
     </div>
   );
