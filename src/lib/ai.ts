@@ -9,10 +9,10 @@ const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 // Override with the GEMINI_MODEL setting if Google renames models.
 export const MODELS = [
   process.env.GEMINI_MODEL?.trim(),
+  "gemini-3.8-flash",
   "gemini-3.5-flash-lite",
   "gemini-3.5-flash",
   "gemini-3.1-flash-lite",
-  "gemini-2.5-flash",
 ].filter(
   (m): m is string => Boolean(m),
 );
@@ -168,6 +168,8 @@ export async function geminiJson(req: GeminiRequest): Promise<unknown> {
   const key = apiKey();
   let res: Response | null = null;
   let body = "";
+  // The most useful failure to report: a busy/limit error beats "model retired".
+  let kept: { res: Response; body: string } | null = null;
 
   // Try each model; on a temporary error (busy/overloaded/rate-limited) wait
   // briefly and retry, then fall back to the next model.
@@ -181,12 +183,14 @@ export async function geminiJson(req: GeminiRequest): Promise<unknown> {
       const temporary = res.status === 429 || res.status >= 500;
       const retired = res.status === 404 || /no longer available|not found|not supported/i.test(body);
       if (retired) continue outer; // model gone: go to the next one
+      kept = { res, body };
       if (!temporary) break outer; // real error (e.g. bad key): stop
       if (attempt === 0) await sleep(1500); // brief pause, then retry same model
     }
     // still busy after a retry: fall through to the next model
   }
   if (!res) throw new AiError("No AI model configured.", "other");
+  if (!res.ok && kept) ({ res, body } = kept);
 
   if (!res.ok) {
     let detail = "";

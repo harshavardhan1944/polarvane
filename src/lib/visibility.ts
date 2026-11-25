@@ -68,9 +68,13 @@ export async function askAssistant(question: string): Promise<AssistantAnswer> {
           }
           return { text, sources: sources.slice(0, 8), webSearch, model };
         }
-        lastStatus = res.status;
-        lastBody = await res.text().catch(() => "");
-        console.error(`[polarvane] visibility ${model} search=${webSearch} ${res.status}:`, lastBody.slice(0, 300));
+        const errBody = await res.text().catch(() => "");
+        // Keep the most useful error: don't let a "model retired" 404 hide a busy/limit error.
+        if (res.status !== 404 || !lastStatus) {
+          lastStatus = res.status;
+          lastBody = errBody;
+        }
+        console.error(`[polarvane] visibility ${model} search=${webSearch} ${res.status}:`, errBody.slice(0, 300));
         if (res.status === 400 && /api key|API_KEY/i.test(lastBody))
           throw new AiError("The Gemini key was rejected. Check GEMINI_API_KEY in Vercel.", "auth");
         if (res.status === 401 || res.status === 403)
