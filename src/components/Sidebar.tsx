@@ -10,6 +10,7 @@ import {
   Sparkles,
   Plug,
   Radar,
+  Megaphone,
   Menu,
   X,
 } from "lucide-react";
@@ -23,6 +24,7 @@ const NAV_GROUPS = [
       { href: "/copilot", label: "Talon copilot", icon: Sparkles },
       { href: "/comments", label: "Comments", icon: MessageSquareText },
       { href: "/ai-visibility", label: "AI visibility", icon: Radar },
+      { href: "/ad-recommendations", label: "Ad recommendations", icon: Megaphone },
     ],
   },
   {
