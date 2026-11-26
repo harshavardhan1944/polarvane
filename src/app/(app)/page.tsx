@@ -1,3 +1,5 @@
+import { DemoBar } from "@/components/DemoBar";
+import { demoLoaded } from "@/lib/demo";
 import { DashboardSwitcher } from "@/components/DashboardSwitcher";
 import { listDashboards, loadPostTitles, postLabel } from "@/lib/dashboards";
 import { computeInsights, keyInsights, loadComments, type CommentRow } from "@/lib/insights";
@@ -31,7 +33,13 @@ export default async function DashboardPage(props: PageProps<"/">) {
     .map((a) => ({ id: a.id, label: postLabel(a, titles) }));
   const selected = typeof sp.post === "string" && posts.some((p) => p.id === sp.post) ? sp.post : "";
 
-  const switcher = <DashboardSwitcher dashboards={dashboards} current={current} />;
+  const demo = await demoLoaded(supabase).catch(() => false);
+  const switcher = (
+    <>
+      <DemoBar loaded={demo} />
+      <DashboardSwitcher dashboards={dashboards} current={current} />
+    </>
+  );
 
   if (error || posts.length === 0) {
     return (
