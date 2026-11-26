@@ -17,7 +17,8 @@ export type TalonReply =
     }
   | { ok: false; message: string; chatId: string | null; historyWarning?: string };
 
-export type ChatSummary = { id: string; title: string; updated_at: string };
+// sourced = the list was filtered by source (Reddit vs all), so reopening the latest chat is safe.
+export type ChatSummary = { id: string; title: string; updated_at: string; sourced?: boolean };
 
 export type StoredMessage =
   | { role: "user"; text: string }
@@ -57,7 +58,11 @@ export async function listChats(dashboardId = "", source: TalonSource = ""): Pro
   };
   let { data, error } = await build(true);
   // The per-source update isn't applied yet: list chats without it.
-  if (error && /source|schema cache/i.test(error.message)) ({ data, error } = await build(false));
+  let sourced = !error;
+  if (error && /source|schema cache/i.test(error.message)) {
+    ({ data, error } = await build(false));
+    sourced = false;
+  }
   if (error) {
     // The per-dashboard update isn't applied yet: show all chats.
     const { data: all } = await supabase
@@ -67,7 +72,7 @@ export async function listChats(dashboardId = "", source: TalonSource = ""): Pro
       .limit(50);
     return (all ?? []) as ChatSummary[];
   }
-  return (data ?? []) as ChatSummary[];
+  return ((data ?? []) as ChatSummary[]).map((c) => ({ ...c, sourced }));
 }
 
 export async function loadChat(chatId: string): Promise<{ postId: string; messages: StoredMessage[] } | null> {

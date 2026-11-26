@@ -6,6 +6,7 @@ import { computeInsights, loadComments } from "@/lib/insights";
 import { createClient } from "@/lib/supabase/server";
 import { listChats, loadChat, type StoredMessage } from "./actions";
 import { AgentRunner } from "../agent/AgentRunner";
+import { listRuns } from "../agent/actions";
 import { TalonChat, type TalonSummary } from "./TalonChat";
 
 // Shared by Talon (all sources) and the Reddit section (Reddit threads only).
@@ -68,7 +69,7 @@ export async function CopilotScreen({
           subtitle="Full plan: give a goal, and the agent runs Polarvane's tools on your comments step by step and writes one plan. It only reads and suggests; it never posts."
         />
         {modeTabs}
-        <AgentRunner dashboards={dashboards ?? []} />
+        <AgentRunner dashboards={dashboards ?? []} initialRuns={await listRuns().catch(() => [])} />
       </>
     );
   }
@@ -121,8 +122,8 @@ export async function CopilotScreen({
   // Reopen the most recent conversation, unless a new question was sent from the dashboard.
   let initialChatId: string | null = null;
   let initialMessages: StoredMessage[] = [];
-  // In the Reddit section, start fresh rather than reopening a chat about other posts.
-  if (!q && chats[0] && !source) {
+  // On Reddit pages, reopen only when chats are kept per source (so it's a Reddit chat).
+  if (!q && chats[0] && (!source || chats[0].sourced)) {
     const last = await loadChat(chats[0].id).catch(() => null);
     if (last) {
       initialChatId = chats[0].id;

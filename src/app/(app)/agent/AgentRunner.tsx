@@ -1,10 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { AlertCircle, Bot, CheckCircle2, Download, Loader2, Quote, Square, XCircle } from "lucide-react";
+import { AlertCircle, Bot, CheckCircle2, Download, History, Loader2, Quote, Square, Trash2, XCircle } from "lucide-react";
 import type { AgentReport, AgentState } from "@/lib/agent";
 import type { DashboardItem } from "@/lib/dashboards";
-import { agentReport, agentStart, agentStep } from "./actions";
+import { agentReport, agentStart, agentStep, deleteRun, openRun, saveRun, type SavedRun } from "./actions";
 
 const EXAMPLES = [
   "Plan our next sunscreen ad",
@@ -31,7 +31,9 @@ function reportToText(goal: string, state: AgentState, r: AgentReport) {
   return lines.join("\n");
 }
 
-export function AgentRunner({ dashboards }: { dashboards: DashboardItem[] }) {
+export function AgentRunner({ dashboards, initialRuns = [] }: { dashboards: DashboardItem[]; initialRuns?: SavedRun[] }) {
+  const [runs, setRuns] = useState<SavedRun[]>(initialRuns);
+  const [saveNote, setSaveNote] = useState("");
   const [goal, setGoal] = useState("");
   const [brand, setBrand] = useState("");
   const [dashboardId, setDashboardId] = useState(dashboards[0]?.id ?? "");
@@ -62,6 +64,12 @@ export function AgentRunner({ dashboards }: { dashboards: DashboardItem[] }) {
       return;
     }
     setReport(rep.report);
+    // Save every finished plan so it shows under "Past plans".
+    const saved = await saveRun(s, rep.report).catch(() => null);
+    if (saved?.ok) {
+      setSaveNote("");
+      setRuns((r) => [{ id: saved.id, goal: s.goal, created_at: new Date().toISOString() }, ...r].slice(0, 30));
+    } else setSaveNote(saved?.message ?? "Couldn’t save this plan.");
   }
 
   async function run() {
@@ -106,6 +114,23 @@ export function AgentRunner({ dashboards }: { dashboards: DashboardItem[] }) {
     } finally {
       setPhase("");
     }
+  }
+
+  async function openPast(id: string) {
+    if (phase) return;
+    setError("");
+    setSaveNote("");
+    const r = await openRun(id);
+    if (!r.ok) return setError(r.message);
+    setGoal(r.state.goal);
+    setBrand(r.state.brand ?? "");
+    setState(r.state);
+    setReport(r.report);
+  }
+
+  async function removePast(id: string) {
+    const r = await deleteRun(id);
+    if (r.ok) setRuns((list) => list.filter((x) => x.id !== id));
   }
 
   function download() {
@@ -308,6 +333,31 @@ export function AgentRunner({ dashboards }: { dashboards: DashboardItem[] }) {
           </p>
         </section>
       )}
+      <section className="panel p-4">
+        <h2 className="mb-2 flex items-center gap-1.5 text-sm font-medium">
+          <History size={14} /> Past plans
+        </h2>
+        {saveNote && <p className="mb-2 text-xs text-amber-200">{saveNote}</p>}
+        {runs.length === 0 ? (
+          <p className="text-xs text-faint">Every plan the agent writes is saved here.</p>
+        ) : (
+          <ul className="divide-y divide-navy-700">
+            {runs.map((r) => (
+              <li key={r.id} className="flex items-center gap-2 py-2">
+                <button onClick={() => openPast(r.id)} className="min-w-0 flex-1 text-left hover:text-brand-blue">
+                  <p className="truncate text-sm">{r.goal}</p>
+                  <p className="text-[11px] text-faint">
+                    {new Date(r.created_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+                  </p>
+                </button>
+                <button onClick={() => removePast(r.id)} title="Delete plan" className="rounded p-1.5 text-faint hover:bg-navy-800 hover:text-red-300">
+                  <Trash2 size={13} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }
