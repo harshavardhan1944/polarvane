@@ -10,6 +10,21 @@ export async function listDashboards(supabase: SupabaseClient): Promise<Dashboar
   return (data ?? []) as DashboardItem[];
 }
 
+// Dashboards that contain at least one analyzed Reddit thread (for the Reddit pages).
+export async function listRedditDashboards(supabase: SupabaseClient): Promise<DashboardItem[]> {
+  const all = await listDashboards(supabase);
+  if (!all?.length) return [];
+  const { data, error } = await supabase
+    .from("analyses")
+    .select("dashboard_id")
+    .eq("post_type", "reddit")
+    .eq("status", "completed")
+    .not("dashboard_id", "is", null);
+  if (error) return [];
+  const ids = new Set((data ?? []).map((r) => r.dashboard_id as string));
+  return all.filter((d) => ids.has(d.id));
+}
+
 // Your own names for posts (id → title). Empty if the titles database update isn't applied yet.
 export async function loadPostTitles(supabase: SupabaseClient): Promise<Map<string, string>> {
   const { data, error } = await supabase.from("analyses").select("id, title").not("title", "is", null);

@@ -11,11 +11,14 @@ export function DashboardSwitcher({
   current,
   basePath = "/",
   allLabel = "All posts",
+  readOnly = false,
 }: {
   dashboards: { id: string; name: string }[] | null;
   current: string;
   basePath?: string;
   allLabel?: string;
+  // Only switch between dashboards (no create / rename / delete).
+  readOnly?: boolean;
 }) {
   const router = useRouter();
   const [creating, setCreating] = useState(false);
@@ -112,7 +115,7 @@ export function DashboardSwitcher({
               <X size={15} />
             </button>
           </form>
-        ) : (
+        ) : readOnly ? null : (
           <button
             onClick={() => setCreating(true)}
             className="inline-flex items-center gap-1 rounded-full border border-dashed border-navy-600 px-3.5 py-1.5 text-sm text-muted hover:border-brand-blue/60 hover:text-ink"
@@ -121,7 +124,7 @@ export function DashboardSwitcher({
           </button>
         )}
 
-        {current && (
+        {current && !readOnly && (
           <span className="ml-auto inline-flex items-center gap-1">
             {renaming ? (
               <form

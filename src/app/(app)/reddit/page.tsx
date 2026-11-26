@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/NotBuiltYet";
 import { DashboardSwitcher } from "@/components/DashboardSwitcher";
-import { listDashboards, loadPostTitles, postLabel } from "@/lib/dashboards";
+import { listRedditDashboards, loadPostTitles, postLabel } from "@/lib/dashboards";
 import { computeInsights, keyInsights, loadComments, type CommentRow } from "@/lib/insights";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardView } from "../DashboardView";
@@ -12,9 +12,10 @@ export const instant = false;
 export default async function RedditDashboardPage(props: PageProps<"/reddit">) {
   const sp = await props.searchParams;
   const supabase = await createClient();
-  const dashboards = await listDashboards(supabase);
-  const current = typeof sp.d === "string" && dashboards?.some((d) => d.id === sp.d) ? sp.d : "";
-  const currentName = dashboards?.find((d) => d.id === current)?.name ?? "";
+  // Only dashboards that have analyzed Reddit threads.
+  const dashboards = await listRedditDashboards(supabase);
+  const current = typeof sp.d === "string" && dashboards.some((d) => d.id === sp.d) ? sp.d : "";
+  const currentName = dashboards.find((d) => d.id === current)?.name ?? "";
 
   type A = { id: string; shortcode: string; post_type: string; dashboard_id?: string | null };
   type R = { data: A[] | null; error: { message: string } | null };
@@ -34,7 +35,9 @@ export default async function RedditDashboardPage(props: PageProps<"/reddit">) {
     .map((a) => ({ id: a.id, label: postLabel(a, titles) }));
   const selected = typeof sp.post === "string" && posts.some((p) => p.id === sp.post) ? sp.post : "";
   const addHref = `/reddit/add${current ? `?d=${current}` : ""}`;
-  const switcher = <DashboardSwitcher dashboards={dashboards} current={current} basePath="/reddit" />;
+  const switcher = dashboards.length ? (
+    <DashboardSwitcher dashboards={dashboards} current={current} basePath="/reddit" allLabel="All threads" readOnly />
+  ) : null;
 
   if (error || posts.length === 0) {
     return (

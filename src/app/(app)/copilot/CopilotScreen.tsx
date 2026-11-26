@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/NotBuiltYet";
 import { DashboardSwitcher } from "@/components/DashboardSwitcher";
-import { listDashboards, loadPostTitles, postLabel } from "@/lib/dashboards";
+import { listDashboards, listRedditDashboards, loadPostTitles, postLabel } from "@/lib/dashboards";
 import { computeInsights, loadComments } from "@/lib/insights";
 import { createClient } from "@/lib/supabase/server";
 import { listChats, loadChat, type StoredMessage } from "./actions";
@@ -22,7 +22,8 @@ export async function CopilotScreen({
   addHref?: string;
 }) {
   const supabase = await createClient();
-  const dashboards = await listDashboards(supabase);
+  // On Reddit pages, only dashboards that have analyzed Reddit threads.
+  const dashboards = source === "reddit" ? await listRedditDashboards(supabase) : await listDashboards(supabase);
   const current = typeof sp.d === "string" && dashboards?.some((d) => d.id === sp.d) ? sp.d : "";
   const currentName = dashboards?.find((d) => d.id === current)?.name ?? "";
 
@@ -37,7 +38,17 @@ export async function CopilotScreen({
     .filter((a) => !current || a.dashboard_id === current)
     .filter((a) => source !== "reddit" || a.post_type === "reddit")
     .map((a) => ({ id: a.id, label: postLabel(a, titles) }));
-  const switcher = <DashboardSwitcher dashboards={dashboards} current={current} basePath={basePath} />;
+  const isRedditPage = source === "reddit";
+  const switcher =
+    isRedditPage && !dashboards?.length ? null : (
+      <DashboardSwitcher
+        dashboards={dashboards}
+        current={current}
+        basePath={basePath}
+        allLabel={isRedditPage ? "All threads" : undefined}
+        readOnly={isRedditPage}
+      />
+    );
 
   // "Ask Polarvane" has two modes: quick answers (Talon) and a full plan (the agent). Reddit pages use quick answers only.
   const plan = !source && sp.mode === "plan";

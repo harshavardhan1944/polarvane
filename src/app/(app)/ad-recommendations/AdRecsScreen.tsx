@@ -2,7 +2,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/NotBuiltYet";
 import { DashboardSwitcher } from "@/components/DashboardSwitcher";
 import { computeSignals, MIN_COMMENTS } from "@/lib/adbrief";
-import { listDashboards, loadPostTitles, postLabel } from "@/lib/dashboards";
+import { listDashboards, listRedditDashboards, loadPostTitles, postLabel } from "@/lib/dashboards";
 import { loadComments } from "@/lib/insights";
 import { createClient } from "@/lib/supabase/server";
 import { AdRecommendations, type PostCard } from "./AdRecommendations";
@@ -20,7 +20,8 @@ export async function AdRecsScreen({
 }) {
   const isReddit = source === "reddit";
   const supabase = await createClient();
-  const dashboards = await listDashboards(supabase);
+  // On Reddit pages, only dashboards that have analyzed Reddit threads.
+  const dashboards = source === "reddit" ? await listRedditDashboards(supabase) : await listDashboards(supabase);
   const current = typeof sp.d === "string" && dashboards?.some((d) => d.id === sp.d) ? sp.d : "";
   const currentName = dashboards?.find((d) => d.id === current)?.name ?? "";
 
@@ -42,7 +43,17 @@ export async function AdRecsScreen({
     .filter((a) => !current || a.dashboard_id === current)
     .filter((a) => !isReddit || a.post_type === "reddit");
 
-  const switcher = <DashboardSwitcher dashboards={dashboards} current={current} basePath={basePath} />;
+  const isRedditPage = source === "reddit";
+  const switcher =
+    isRedditPage && !dashboards?.length ? null : (
+      <DashboardSwitcher
+        dashboards={dashboards}
+        current={current}
+        basePath={basePath}
+        allLabel={isRedditPage ? "All threads" : undefined}
+        readOnly={isRedditPage}
+      />
+    );
   const header = (
     <PageHeader
       title={isReddit ? "Reddit ad recommendations" : "Ad recommendations"}
