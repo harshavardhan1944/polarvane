@@ -125,7 +125,7 @@ export function RedditSearch({ dashboardId = "" }: { dashboardId?: string }) {
           {phase === "searching" ? "Searching Reddit… (up to 1–2 min)" : "Search"}
         </button>
       </form>
-      <p className="text-[11px] text-faint">Uses the Apify Reddit scraper: a search of 25 threads costs about $0.10.</p>
+      <p className="text-[11px] text-faint">Uses an Apify Reddit search tool (no Reddit login): a search of 25 threads costs about $0.06.</p>
 
       {error && (
         <p className="flex items-start gap-1.5 text-xs text-red-300">

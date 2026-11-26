@@ -116,25 +116,27 @@ export async function startRedditRun(postUrl: string, limit: number) {
   return { runId: json.data.id as string };
 }
 
-// Finds Reddit threads for a keyword (posts only, no comments: cheap).
+// Finds Reddit threads for a keyword (posts only, no comments: cheap). Uses a search tool that
+// needs no Reddit login. Set APIFY_REDDIT_SEARCH_ACTOR in Vercel to switch.
+const REDDIT_SEARCH_ACTOR = (process.env.APIFY_REDDIT_SEARCH_ACTOR ?? "harshmaur/reddit-search-scraper")
+  .trim()
+  .replace("/", "~");
+
 export async function startRedditSearch(query: string, time: string, maxPosts: number) {
   const input = {
-    searches: [query],
+    searchTerms: [query],
+    searchSort: "relevance",
+    searchTime: time,
     searchPosts: true,
     searchComments: false,
     searchCommunities: false,
-    searchUsers: false,
-    sort: "relevance",
-    time,
-    maxPostCount: maxPosts,
-    maxItems: maxPosts,
-    skipComments: true,
-    skipUserPosts: true,
-    skipCommunity: true,
+    maxPostsCount: maxPosts,
+    maxCommentsCount: 0,
+    maxCommunitiesCount: 0,
+    crawlCommentsPerPost: false,
     includeNSFW: false,
-    proxy: { useApifyProxy: true },
   };
-  const json = await apifyFetch(`/acts/${REDDIT_ACTOR}/runs?maxItems=${maxPosts}`, {
+  const json = await apifyFetch(`/acts/${REDDIT_SEARCH_ACTOR}/runs?maxItems=${maxPosts}`, {
     method: "POST",
     body: JSON.stringify(input),
   });
