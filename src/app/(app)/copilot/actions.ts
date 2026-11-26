@@ -123,7 +123,7 @@ export async function sendToTalon(
     if (!UUID.test(postId)) return { ok: false, message: "Invalid post.", chatId: chatIdIn };
     const { data: a } = await supabase.from("analyses").select("shortcode, post_type").eq("id", postId).maybeSingle();
     if (!a) return { ok: false, message: "Post not found.", chatId: chatIdIn };
-    scopeLabel = `one ${a.post_type === "reel" ? "Reel" : "post"} (${a.shortcode})`;
+    scopeLabel = `one ${a.post_type === "reel" ? "Reel" : a.post_type === "reddit" ? "Reddit thread" : "post"} (${a.shortcode})`;
   }
 
   // ---- Save the question (history is optional: never block the answer) ----

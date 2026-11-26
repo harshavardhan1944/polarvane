@@ -2,6 +2,7 @@
 
 import { refresh } from "next/cache";
 import { parseInstagramUrl } from "@/lib/instagram";
+import { fetchRedditThread, isRedditLink, parseRedditUrl, RedditError, resolveShareLink } from "@/lib/reddit";
 import { ApifyError, fetchPostDetails, getDatasetItems, getRun, mapApifyItems, startCommentRun } from "@/lib/apify";
 import { AiError, classifyComments } from "@/lib/ai";
 import { ALL_COMMENTS, COMMENT_LIMITS } from "@/lib/pricing";
@@ -24,7 +25,14 @@ export async function createAnalysis(
   _prev: CreateAnalysisState,
   formData: FormData,
 ): Promise<CreateAnalysisState> {
-  const parsed = parseInstagramUrl(String(formData.get("url") ?? ""));
+  const input = String(formData.get("url") ?? "");
+  let parsed: { ok: true; shortcode: string; postType: "post" | "reel" | "reddit"; canonicalUrl: string } | { ok: false; error: string };
+  if (isRedditLink(input)) {
+    const r = parseRedditUrl(await resolveShareLink(input));
+    parsed = r.ok ? { ok: true, shortcode: r.shortcode, postType: "reddit", canonicalUrl: r.canonicalUrl } : r;
+  } else {
+    parsed = parseInstagramUrl(input);
+  }
   if (!parsed.ok) return { status: "error", message: parsed.error };
 
   const supabase = await createClient();
@@ -66,6 +74,8 @@ export async function createAnalysis(
   if (insertError && /dashboard_id|schema cache/i.test(insertError.message)) {
     ({ error: insertError } = await supabase.from("analyses").insert(row));
   }
+  if (insertError && parsed.postType === "reddit" && (insertError.code === "23514" || /post_type/i.test(insertError.message)))
+    return { status: "error", message: "Reddit needs a one-time database update: run 010_reddit.sql in Supabase." };
   if (insertError) {
     if (insertError.code === "23505")
       return { status: "duplicate", message: "You’ve already added this post. It’s in your list below." };
@@ -76,7 +86,7 @@ export async function createAnalysis(
   refresh();
   return {
     status: "created",
-    message: `${parsed.postType === "reel" ? "Reel" : "Post"} saved. Choose how many comments to collect below.`,
+    message: `${parsed.postType === "reddit" ? "Reddit thread" : parsed.postType === "reel" ? "Reel" : "Post"} saved. Choose how many comments to collect below.`,
   };
 }
 
@@ -115,12 +125,13 @@ export async function startCollection(id: string, limit: number): Promise<Collec
 
   const { data: analysis } = await supabase
     .from("analyses")
-    .select("id, post_url, status")
+    .select("id, post_url, post_type, status")
     .eq("id", id)
     .maybeSingle();
   if (!analysis) return { ok: false, message: "Post not found." };
   if (!["queued", "failed", "completed"].includes(analysis.status))
     return { ok: false, message: "This post is already being processed." };
+  if (analysis.post_type === "reddit") return collectReddit(supabase, user.id, id, analysis.post_url, analysis.status, limit);
 
   // Protect against accidental runaway costs: limit parallel jobs per user.
   const { count } = await supabase
@@ -349,12 +360,28 @@ export async function fetchDetails(id: string): Promise<DetailsResult> {
 
   const { data: analysis, error } = await supabase
     .from("analyses")
-    .select("id, post_url, details_status")
+    .select("id, post_url, post_type, details_status")
     .eq("id", id)
     .maybeSingle();
   if (error) return { ok: false, message: "Post details need the database update (part 3) in Supabase." };
   if (!analysis) return { ok: false, message: "Post not found." };
   if (analysis.details_status === "fetching") return { ok: true };
+
+  if (analysis.post_type === "reddit") {
+    const parsed = parseRedditUrl(analysis.post_url);
+    if (!parsed.ok) return { ok: false, message: parsed.error };
+    try {
+      const thread = await fetchRedditThread(parsed.postId, 10);
+      await supabase.from("analyses").update({ ...thread.details, details_status: "done" }).eq("id", id);
+      if (thread.title) await supabase.from("analyses").update({ title: thread.title }).eq("id", id).is("title", null);
+      refresh();
+      return { ok: true };
+    } catch (err) {
+      await supabase.from("analyses").update({ details_status: "failed" }).eq("id", id);
+      refresh();
+      return { ok: false, message: err instanceof RedditError ? err.message : "Couldn’t fetch the Reddit thread." };
+    }
+  }
 
   await supabase.from("analyses").update({ details_status: "fetching" }).eq("id", id);
   try {
@@ -447,4 +474,62 @@ export async function renamePost(id: string, title: string): Promise<{ ok: boole
     };
   refresh();
   return { ok: true };
+}
+
+// ---------------- Reddit (official API, free, collected directly) ----------------
+
+type Supa = Awaited<ReturnType<typeof createClient>>;
+
+async function collectReddit(
+  supabase: Supa,
+  userId: string,
+  id: string,
+  postUrl: string,
+  fromStatus: string,
+  limit: number,
+): Promise<CollectionResult> {
+  const parsed = parseRedditUrl(postUrl);
+  if (!parsed.ok) return { ok: false, message: parsed.error };
+  const { data: claimed } = await supabase
+    .from("analyses")
+    .update({ status: "collecting", comment_limit: Math.min(limit, 5000), error_message: null, apify_run_id: null })
+    .eq("id", id)
+    .eq("status", fromStatus)
+    .select("id");
+  if (!claimed || claimed.length === 0) return { ok: false, message: "This thread is already being processed." };
+
+  const fail = async (message: string) => {
+    await supabase.from("analyses").update({ status: "failed", error_message: message }).eq("id", id);
+    refresh();
+    return { ok: false as const, message };
+  };
+
+  try {
+    const thread = await fetchRedditThread(parsed.postId, limit);
+    await supabase.from("analyses").update({ ...thread.details, details_status: "done" }).eq("id", id);
+    // Use the thread title as the name, unless the user already renamed it.
+    if (thread.title) await supabase.from("analyses").update({ title: thread.title }).eq("id", id).is("title", null);
+    if (thread.comments.length === 0) return fail("This Reddit thread has no readable comments yet.");
+
+    for (let i = 0; i < thread.comments.length; i += 500) {
+      const batch = thread.comments.slice(i, i + 500).map((c) => ({ ...c, analysis_id: id, user_id: userId }));
+      const { error } = await supabase
+        .from("comments")
+        .upsert(batch, { onConflict: "analysis_id,external_id", ignoreDuplicates: true });
+      if (error) {
+        console.error("[polarvane] saving reddit comments failed:", error);
+        return fail("Comments were collected but couldn’t be saved. Please try again.");
+      }
+    }
+    const { count } = await supabase.from("comments").select("id", { count: "exact", head: true }).eq("analysis_id", id);
+    await supabase
+      .from("analyses")
+      .update({ status: "analyzing", comments_collected: count ?? thread.comments.length, error_message: null })
+      .eq("id", id);
+    refresh();
+    return { ok: true, status: "analyzing" };
+  } catch (err) {
+    console.error("[polarvane] reddit collection failed:", err);
+    return fail(err instanceof RedditError ? err.message : "Couldn’t collect Reddit comments. Please try again.");
+  }
 }

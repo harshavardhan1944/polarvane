@@ -3,6 +3,7 @@
 import { useActionState, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, Info, Loader2, Link2 } from "lucide-react";
 import { parseInstagramUrl } from "@/lib/instagram";
+import { isRedditLink, parseRedditUrl } from "@/lib/reddit-url";
 import { createAnalysis, type CreateAnalysisState } from "./actions";
 
 export function NewAnalysisForm({ dashboardId = "" }: { dashboardId?: string }) {
@@ -14,7 +15,14 @@ export function NewAnalysisForm({ dashboardId = "" }: { dashboardId?: string }) 
   const formRef = useRef<HTMLFormElement>(null);
 
   // Instant feedback while typing (the server checks again on submit).
-  const live = url.trim() ? parseInstagramUrl(url) : null;
+  // Reddit share links (/s/…) are resolved on the server, so they're accepted here.
+  const live = !url.trim()
+    ? null
+    : isRedditLink(url)
+      ? /\/s\/[a-z0-9]+/i.test(url)
+        ? ({ ok: true } as const)
+        : parseRedditUrl(url)
+      : parseInstagramUrl(url);
   const liveError = touched && live && !live.ok ? live.error : null;
 
   // Clear the box after a successful save (adjusting state during render).
@@ -43,9 +51,9 @@ export function NewAnalysisForm({ dashboardId = "" }: { dashboardId?: string }) 
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             onBlur={() => setTouched(true)}
-            placeholder="https://www.instagram.com/p/… or /reel/…"
+            placeholder="Instagram post / Reel link, or a Reddit thread link"
             autoComplete="off"
-            aria-label="Instagram post or Reel link"
+            aria-label="Instagram post, Reel or Reddit thread link"
             className="w-full rounded-lg border border-navy-700 bg-navy-900 py-2.5 pl-9 pr-3 text-sm outline-none placeholder:text-faint focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/25"
           />
         </div>
@@ -55,13 +63,14 @@ export function NewAnalysisForm({ dashboardId = "" }: { dashboardId?: string }) 
           className="brand-gradient inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-brand-violet/20 hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {pending && <Loader2 size={15} className="animate-spin" />}
-          Add post
+          Add
         </button>
       </form>
 
       {live?.ok && !pending && state.status !== "created" && (
         <p className="mt-3 flex items-center gap-1.5 text-xs text-emerald-300">
-          <CheckCircle2 size={13} /> Valid Instagram {live.postType === "reel" ? "Reel" : "post"} link
+          <CheckCircle2 size={13} />{" "}
+          {"postType" in live ? `Valid Instagram ${live.postType === "reel" ? "Reel" : "post"} link` : "Valid Reddit thread link"}
         </p>
       )}
       {liveError && (

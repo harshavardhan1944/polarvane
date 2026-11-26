@@ -13,8 +13,11 @@ import {
   RotateCcw,
   Sparkles,
   Trash2,
+  MessagesSquare,
 } from "lucide-react";
 import { COMMENT_LIMITS, estimateApifyCost, isAllOption, limitLabel } from "@/lib/pricing";
+
+const REDDIT_LIMITS = [50, 200, 500] as const;
 import { SentimentBar, SentimentLegend } from "@/components/charts";
 import { moveToDashboard } from "../dashboards/actions";
 import {
@@ -32,7 +35,7 @@ export type AnalysisRowData = {
   id: string;
   post_url: string;
   shortcode: string;
-  post_type: "post" | "reel";
+  post_type: "post" | "reel" | "reddit";
   status: "queued" | "collecting" | "analyzing" | "completed" | "failed";
   error_message: string | null;
   comments_collected: number;
@@ -172,7 +175,8 @@ export function AnalysisRow({ row }: { row: AnalysisRowData }) {
   }
 
   const badge = BADGE[row.status];
-  const Icon = row.post_type === "reel" ? Clapperboard : ImageIcon;
+  const isReddit = row.post_type === "reddit";
+  const Icon = row.post_type === "reel" ? Clapperboard : isReddit ? MessagesSquare : ImageIcon;
   const [recollect, setRecollect] = useState(false);
   const canStart = row.status === "queued" || row.status === "failed" || (row.status === "completed" && recollect);
 
@@ -221,7 +225,7 @@ export function AnalysisRow({ row }: { row: AnalysisRowData }) {
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 truncate text-sm hover:text-brand-blue"
                 >
-                  {row.title || `${row.post_type === "reel" ? "Reel" : "Post"} · ${row.shortcode}`}
+                  {row.title || (isReddit ? `Reddit thread · ${row.shortcode.replace("reddit_", "")}` : `${row.post_type === "reel" ? "Reel" : "Post"} · ${row.shortcode}`)}
                   <ExternalLink size={12} className="shrink-0 text-faint" />
                 </a>
                 <button
@@ -312,10 +316,10 @@ export function AnalysisRow({ row }: { row: AnalysisRowData }) {
                 </>
               )}
               <p className="num mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-faint">
-                {row.post_owner && <span>by @{row.post_owner}</span>}
-                {row.likes_count != null && <span>{row.likes_count.toLocaleString()} likes</span>}
+                {row.post_owner && <span>{isReddit ? `in ${row.post_owner}` : `by @${row.post_owner}`}</span>}
+                {row.likes_count != null && <span>{row.likes_count.toLocaleString()} {isReddit ? "upvotes" : "likes"}</span>}
                 {row.views_count != null && <span>{row.views_count.toLocaleString()} views</span>}
-                {row.comments_reported != null && <span>{row.comments_reported.toLocaleString()} comments on Instagram</span>}
+                {row.comments_reported != null && <span>{row.comments_reported.toLocaleString()} comments on {isReddit ? "Reddit" : "Instagram"}</span>}
                 {row.post_published_at && (
                   <span>
                     posted{" "}
@@ -454,7 +458,7 @@ export function AnalysisRow({ row }: { row: AnalysisRowData }) {
               disabled={pending}
               className="rounded-md border border-navy-700 bg-navy-850 px-2 py-1 text-xs text-ink outline-none focus:border-brand-blue"
             >
-              {COMMENT_LIMITS.map((n) => (
+              {(isReddit ? REDDIT_LIMITS : COMMENT_LIMITS).map((n) => (
                 <option key={n} value={n}>
                   {limitLabel(n)}
                 </option>
@@ -462,7 +466,9 @@ export function AnalysisRow({ row }: { row: AnalysisRowData }) {
             </select>
           </label>
           <span className="text-xs text-faint">
-            {isAllOption(limit)
+            {isReddit
+              ? "Free: uses Reddit’s official API (up to 500 comments per thread)."
+              : isAllOption(limit)
               ? "You pay only for comments actually collected: about $2.30–2.70 per 1,000 (e.g. ~1,100 comments ≈ $2.50–3.00)"
               : `Estimated Apify cost: about ${estimateApifyCost(limit)}`}
           </span>
@@ -491,7 +497,7 @@ export function AnalysisRow({ row }: { row: AnalysisRowData }) {
                   className="brand-gradient inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
                 >
                   {pending && <Loader2 size={13} className="animate-spin" />}
-                  Confirm · {isAllOption(limit) ? "max $13.50" : `up to ${estimateApifyCost(limit).split("–")[1]}`}
+                  Confirm · {isReddit ? "free" : isAllOption(limit) ? "max $13.50" : `up to ${estimateApifyCost(limit).split("–")[1]}`}
                 </button>
               </>
             )}

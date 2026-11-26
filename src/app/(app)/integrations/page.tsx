@@ -1,10 +1,13 @@
+import { connection } from "next/server";
 import { PageHeader } from "@/components/NotBuiltYet";
+import { redditConfigured } from "@/lib/reddit";
 
-const ITEMS = [
+// Keys are read on the server only; the page shows just whether each source is connected.
+const ITEMS = () => [
   {
     name: "Instagram public comments (via Apify)",
     detail: "Collects visible comments from public posts and Reels you paste in.",
-    status: "Not connected yet",
+    status: process.env.APIFY_TOKEN ? "Connected" : "Not connected yet",
   },
   {
     name: "Instagram official account connection (Meta)",
@@ -12,11 +15,16 @@ const ITEMS = [
     status: "Planned",
   },
   { name: "Facebook", detail: "Official, authorized access only.", status: "Planned" },
-  { name: "Reddit", detail: "Official, authorized access only.", status: "Planned" },
+  {
+    name: "Reddit (official API)",
+    detail: "Paste a Reddit thread link on Analyze to collect and analyze its comments. Usernames are never stored.",
+    status: redditConfigured() ? "Connected" : "Add REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET in Vercel",
+  },
   { name: "X", detail: "Official, authorized access only.", status: "Planned" },
 ];
 
-export default function IntegrationsPage() {
+export default async function IntegrationsPage() {
+  await connection();
   return (
     <>
       <PageHeader
@@ -24,7 +32,7 @@ export default function IntegrationsPage() {
         subtitle="Data sources Polarvane can use. Only working integrations are marked as connected."
       />
       <div className="panel divide-y divide-navy-700">
-        {ITEMS.map((i) => (
+        {ITEMS().map((i) => (
           <div key={i.name} className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-medium">{i.name}</p>

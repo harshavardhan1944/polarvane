@@ -18,5 +18,10 @@ export async function loadPostTitles(supabase: SupabaseClient): Promise<Map<stri
 }
 
 export function postLabel(p: { id: string; post_type: string; shortcode: string }, titles: Map<string, string>) {
-  return titles.get(p.id) ?? `${p.post_type === "reel" ? "Reel" : "Post"} · ${p.shortcode}`;
+  return (
+    titles.get(p.id) ??
+    (p.post_type === "reddit"
+      ? `Reddit thread · ${p.shortcode.replace("reddit_", "")}`
+      : `${p.post_type === "reel" ? "Reel" : "Post"} · ${p.shortcode}`)
+  );
 }
