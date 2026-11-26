@@ -158,9 +158,11 @@ async function callGemini(model: string, key: string, req: GeminiRequest) {
         safetySettings: SAFETY,
       }),
       cache: "no-store",
+      // Don't let one slow answer hang the whole request.
+      signal: AbortSignal.timeout(45_000),
     });
   } catch {
-    throw new AiError("Couldn’t reach the AI service. Retrying shortly…", "busy");
+    throw new AiError("The AI service is slow to answer right now. Please try again.", "busy");
   }
 }
 
@@ -175,8 +177,11 @@ export async function geminiJson(req: GeminiRequest): Promise<unknown> {
   // Try each model; on a temporary error (busy/overloaded/rate-limited) wait
   // briefly and retry, then fall back to the next model.
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const started = Date.now();
   outer: for (const model of MODELS) {
     for (let attempt = 0; attempt < 2; attempt++) {
+      // Overall time budget so a busy AI service can't run past the server's time limit.
+      if (res && Date.now() - started > 90_000) break outer;
       res = await callGemini(model, key, req);
       if (res.ok) break outer;
       body = await res.text().catch(() => "");

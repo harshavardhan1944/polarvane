@@ -41,6 +41,29 @@ export function AgentRunner({ dashboards }: { dashboards: DashboardItem[] }) {
   const [error, setError] = useState("");
   const stop = useRef(false);
 
+  // Server calls can fail on a network hiccup or a server time limit; try once more before giving up.
+  async function call<T>(fn: () => Promise<T>): Promise<T | { ok: false; message: string }> {
+    for (let i = 0; i < 2; i++) {
+      try {
+        return await fn();
+      } catch {
+        if (i === 0) await new Promise((r) => setTimeout(r, 3000));
+      }
+    }
+    return { ok: false, message: "The server took too long to answer (the AI service may be busy)." };
+  }
+
+  async function writePlan(s: AgentState, note = "") {
+    setPhase("writing");
+    setError(note);
+    const rep = await call(() => agentReport(s));
+    if (!rep.ok) {
+      setError(`${rep.message} Your steps are kept; click “Write the plan again”.`);
+      return;
+    }
+    setReport(rep.report);
+  }
+
   async function run() {
     setError("");
     setReport(null);
@@ -49,25 +72,37 @@ export function AgentRunner({ dashboards }: { dashboards: DashboardItem[] }) {
     stop.current = false;
     setPhase("starting");
     try {
-      const started = await agentStart(goal, brand, dashboardId);
+      const started = await call(() => agentStart(goal, brand, dashboardId));
       if (!started.ok) throw new Error(started.message);
       let s = started.state;
       setState(s);
       setPhase("working");
+      let note = "";
       for (let i = 0; i < 8 && !stop.current; i++) {
-        const res = await agentStep(s);
-        if (!res.ok) throw new Error(res.message);
+        const res = await call(() => agentStep(s));
+        if (!res.ok) {
+          if (!s.steps.length) throw new Error(res.message);
+          // Keep what's done and write the plan from it.
+          note = `A step didn’t finish (${res.message}). The plan below uses the ${s.steps.length} steps that did.`;
+          break;
+        }
         s = res.state;
         setState(s);
         if (res.done) break;
       }
       if (!s.steps.length) throw new Error("The agent stopped before running any step. Try rewording the goal.");
-      setPhase("writing");
-      const rep = await agentReport(s);
-      if (!rep.ok) throw new Error(rep.message);
-      setReport(rep.report);
+      await writePlan(s, note);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong. Please try again.");
+    } finally {
+      setPhase("");
+    }
+  }
+
+  async function retryPlan() {
+    if (!state) return;
+    try {
+      await writePlan(state);
     } finally {
       setPhase("");
     }
@@ -161,9 +196,17 @@ export function AgentRunner({ dashboards }: { dashboards: DashboardItem[] }) {
           )}
         </div>
         {error && (
-          <p className="flex items-start gap-1.5 text-xs text-red-300">
+          <p className={`flex items-start gap-1.5 text-xs ${report ? "text-amber-200" : "text-red-300"}`}>
             <AlertCircle size={13} className="mt-0.5 shrink-0" /> {error}
           </p>
+        )}
+        {!busy && state && state.steps.length > 0 && !report && (
+          <button
+            onClick={retryPlan}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-navy-600 px-3 py-2 text-xs hover:bg-navy-800"
+          >
+            <Bot size={13} /> Write the plan again
+          </button>
         )}
       </section>
 

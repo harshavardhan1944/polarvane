@@ -35,6 +35,7 @@ async function callAssistant(model: string, key: string, question: string, webSe
         safetySettings: SAFETY,
       }),
       cache: "no-store",
+      signal: AbortSignal.timeout(45_000),
     });
   } catch {
     throw new AiError("Couldn’t reach the AI service. Please try again.", "busy");
@@ -47,9 +48,12 @@ export async function askAssistant(question: string): Promise<AssistantAnswer> {
   const key = apiKey();
   let lastStatus = 0;
   let lastBody = "";
+  const started = Date.now();
   for (const webSearch of [true, false]) {
     for (const model of MODELS) {
       for (let attempt = 0; attempt < 2; attempt++) {
+        if (lastStatus && Date.now() - started > 80_000)
+          throw new AiError("The AI assistant is busy right now. Please try again in a minute.", "busy");
         const res = await callAssistant(model, key, question, webSearch);
         if (res.ok) {
           const json = await res.json();

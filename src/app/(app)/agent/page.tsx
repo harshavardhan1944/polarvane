@@ -4,7 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { AgentRunner } from "./AgentRunner";
 
 export const instant = false;
-export const maxDuration = 120;
+// Each step can wait on the AI service; allow the longest time Vercel permits.
+export const maxDuration = 300;
 
 export default async function AgentPage() {
   const supabase = await createClient();
