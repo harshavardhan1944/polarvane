@@ -77,7 +77,7 @@ export async function CopilotScreen({
     console.error("[polarvane] copilot summary failed:", e);
   }
 
-  const chats = await listChats(current).catch(() => []);
+  const chats = await listChats(current, source).catch(() => []);
   const q = typeof sp.q === "string" ? sp.q.slice(0, 1000) : "";
   let post = typeof sp.post === "string" && posts.some((p) => p.id === sp.post) ? sp.post : "";
 
