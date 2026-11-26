@@ -6,7 +6,7 @@ import { parseInstagramUrl } from "@/lib/instagram";
 import { isRedditLink, parseRedditUrl } from "@/lib/reddit-url";
 import { createAnalysis, type CreateAnalysisState } from "./actions";
 
-export function NewAnalysisForm({ dashboardId = "" }: { dashboardId?: string }) {
+export function NewAnalysisForm({ dashboardId = "", source = "instagram" }: { dashboardId?: string; source?: "instagram" | "reddit" }) {
   const [state, action, pending] = useActionState<CreateAnalysisState, FormData>(createAnalysis, {
     status: "idle",
   });
@@ -16,13 +16,19 @@ export function NewAnalysisForm({ dashboardId = "" }: { dashboardId?: string }) 
 
   // Instant feedback while typing (the server checks again on submit).
   // Reddit share links (/s/…) are resolved on the server, so they're accepted here.
+  const wrongPlace =
+    source === "reddit"
+      ? "That’s not a Reddit link. For Instagram, use the Instagram tab."
+      : "That’s a Reddit link. Use the Reddit tab for Reddit.";
   const live = !url.trim()
     ? null
-    : isRedditLink(url)
-      ? /\/s\/[a-z0-9]+/i.test(url)
-        ? ({ ok: true } as const)
-        : parseRedditUrl(url)
-      : parseInstagramUrl(url);
+    : isRedditLink(url) !== (source === "reddit")
+      ? ({ ok: false, error: wrongPlace } as const)
+      : source === "reddit"
+        ? /\/s\/[a-z0-9]+/i.test(url)
+          ? ({ ok: true } as const)
+          : parseRedditUrl(url)
+        : parseInstagramUrl(url);
   const liveError = touched && live && !live.ok ? live.error : null;
 
   // Clear the box after a successful save (adjusting state during render).
@@ -51,9 +57,9 @@ export function NewAnalysisForm({ dashboardId = "" }: { dashboardId?: string }) 
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             onBlur={() => setTouched(true)}
-            placeholder="Instagram post / Reel link, or a Reddit thread link"
+            placeholder={source === "reddit" ? "https://www.reddit.com/r/…/comments/…" : "https://www.instagram.com/p/… or /reel/…"}
             autoComplete="off"
-            aria-label="Instagram post, Reel or Reddit thread link"
+            aria-label={source === "reddit" ? "Reddit thread link" : "Instagram post or Reel link"}
             className="w-full rounded-lg border border-navy-700 bg-navy-900 py-2.5 pl-9 pr-3 text-sm outline-none placeholder:text-faint focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/25"
           />
         </div>
@@ -86,7 +92,16 @@ export function NewAnalysisForm({ dashboardId = "" }: { dashboardId?: string }) 
       {!pending && state.status === "created" && <Message tone="success">{state.message}</Message>}
 
       <p className="mt-4 text-xs leading-relaxed text-faint">
-        Works with public posts and Reels only. Tip: in Instagram, tap <b>Share → Copy link</b>. AI analysis
+        {source === "reddit" ? (
+          <>
+            Works with public Reddit threads. Tip: on Reddit, tap <b>Share → Copy link</b>, or copy the address bar.
+          </>
+        ) : (
+          <>
+            Works with public posts and Reels only. Tip: in Instagram, tap <b>Share → Copy link</b>.
+          </>
+        )}{" "}
+        AI analysis
         currently uses Google Gemini’s free plan, under which Google may use submitted comments to improve its
         products.
       </p>

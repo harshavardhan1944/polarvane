@@ -3,8 +3,7 @@ import { DashboardSwitcher } from "@/components/DashboardSwitcher";
 import { listDashboards, loadPostTitles } from "@/lib/dashboards";
 import { createClient } from "@/lib/supabase/server";
 import { AnalysisRow, type AnalysisRowData } from "./AnalysisRow";
-import { NewAnalysisForm } from "./NewAnalysisForm";
-import { RedditSearch } from "./RedditSearch";
+import { AddSource } from "./AddSource";
 
 export const instant = false;
 // Fetching post details can take up to ~2 minutes.
@@ -88,10 +87,7 @@ export default async function AnalyzePage(props: PageProps<"/analyze">) {
           New posts will be added to <span className="text-ink">{currentName}</span>.
         </p>
       )}
-      <NewAnalysisForm dashboardId={current} />
-      <div className="mt-4">
-        <RedditSearch key={current} dashboardId={current} />
-      </div>
+      <AddSource key={current} dashboardId={current} />
 
       <h2 className="mb-3 mt-8 text-sm font-medium text-muted">{currentName ? `Posts in ${currentName}` : "Your posts"}</h2>
 
