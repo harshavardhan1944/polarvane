@@ -16,9 +16,10 @@ const ITEMS = () => [
   },
   { name: "Facebook", detail: "Official, authorized access only.", status: "Planned" },
   {
-    name: "Reddit (official API)",
-    detail: "Paste a Reddit thread link on Analyze to collect and analyze its comments. Usernames are never stored.",
-    status: redditConfigured() ? "Connected" : "Add REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET in Vercel",
+    name: "Reddit",
+    detail:
+      "Paste a Reddit thread link on Analyze. Uses Reddit’s official API when its keys are added, otherwise the Apify Reddit scraper. Usernames are never stored.",
+    status: redditConfigured() ? "Connected (official API)" : process.env.APIFY_TOKEN ? "Connected (via Apify)" : "Not connected",
   },
   { name: "X", detail: "Official, authorized access only.", status: "Planned" },
 ];

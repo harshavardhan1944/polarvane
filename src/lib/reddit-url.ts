@@ -23,10 +23,12 @@ export function parseRedditUrl(input: string): ParsedRedditUrl {
   const host = url.hostname.toLowerCase();
   const parts = url.pathname.split("/").filter(Boolean);
   let id: string | undefined;
+  let sub = "";
   if (host === "redd.it" || host === "www.redd.it") id = parts[0];
   else if (HOSTS.has(host)) {
     const i = parts.findIndex((p) => p.toLowerCase() === "comments");
     if (i !== -1) id = parts[i + 1];
+    if (parts[0]?.toLowerCase() === "r" && /^[a-z0-9_]{2,30}$/i.test(parts[1] ?? "")) sub = parts[1];
     else if (parts.includes("s"))
       return { ok: false, error: "Open the Reddit share link in your browser, then copy the full address from the address bar." };
   } else return { ok: false, error: "That isn’t a Reddit link." };
@@ -34,6 +36,7 @@ export function parseRedditUrl(input: string): ParsedRedditUrl {
   if (!id || !/^[a-z0-9]{4,12}$/i.test(id))
     return { ok: false, error: "That isn’t a Reddit post link. It should look like reddit.com/r/…/comments/…" };
   id = id.toLowerCase();
-  return { ok: true, postId: id, canonicalUrl: `https://www.reddit.com/comments/${id}/`, shortcode: `reddit_${id}` };
+  const canonicalUrl = sub ? `https://www.reddit.com/r/${sub}/comments/${id}/` : `https://www.reddit.com/comments/${id}/`;
+  return { ok: true, postId: id, canonicalUrl, shortcode: `reddit_${id}` };
 }
 

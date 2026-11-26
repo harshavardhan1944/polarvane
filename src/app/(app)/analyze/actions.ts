@@ -2,8 +2,16 @@
 
 import { refresh } from "next/cache";
 import { parseInstagramUrl } from "@/lib/instagram";
-import { fetchRedditThread, isRedditLink, parseRedditUrl, RedditError, resolveShareLink } from "@/lib/reddit";
-import { ApifyError, fetchPostDetails, getDatasetItems, getRun, mapApifyItems, startCommentRun } from "@/lib/apify";
+import {
+  fetchRedditThread,
+  isRedditLink,
+  mapApifyRedditItems,
+  parseRedditUrl,
+  RedditError,
+  redditConfigured,
+  resolveShareLink,
+} from "@/lib/reddit";
+import { ApifyError, fetchPostDetails, getDatasetItems, getRun, mapApifyItems, startCommentRun, startRedditRun } from "@/lib/apify";
 import { AiError, classifyComments } from "@/lib/ai";
 import { ALL_COMMENTS, COMMENT_LIMITS } from "@/lib/pricing";
 import { createClient } from "@/lib/supabase/server";
@@ -131,7 +139,9 @@ export async function startCollection(id: string, limit: number): Promise<Collec
   if (!analysis) return { ok: false, message: "Post not found." };
   if (!["queued", "failed", "completed"].includes(analysis.status))
     return { ok: false, message: "This post is already being processed." };
-  if (analysis.post_type === "reddit") return collectReddit(supabase, user.id, id, analysis.post_url, analysis.status, limit);
+  const isReddit = analysis.post_type === "reddit";
+  // Reddit: official API when keys are set (free), otherwise the Apify Reddit scraper.
+  if (isReddit && redditConfigured()) return collectReddit(supabase, user.id, id, analysis.post_url, analysis.status, limit);
 
   // Protect against accidental runaway costs: limit parallel jobs per user.
   const { count } = await supabase
@@ -151,7 +161,9 @@ export async function startCollection(id: string, limit: number): Promise<Collec
   if (!claimed || claimed.length === 0) return { ok: false, message: "This post is already being processed." };
 
   try {
-    const { runId } = await startCommentRun(analysis.post_url, limit, limit >= ALL_COMMENTS);
+    const { runId } = isReddit
+      ? await startRedditRun(analysis.post_url, Math.min(limit, 1000))
+      : await startCommentRun(analysis.post_url, limit, limit >= ALL_COMMENTS);
     await supabase.from("analyses").update({ apify_run_id: runId }).eq("id", id);
     refresh();
     return { ok: true, status: "collecting" };
@@ -174,7 +186,7 @@ export async function checkCollection(id: string): Promise<CollectionResult> {
 
   const { data: analysis } = await supabase
     .from("analyses")
-    .select("id, status, apify_run_id, comment_limit, updated_at")
+    .select("id, post_type, status, apify_run_id, comment_limit, updated_at")
     .eq("id", id)
     .maybeSingle();
   if (!analysis) return { ok: false, message: "Post not found." };
@@ -200,8 +212,19 @@ export async function checkCollection(id: string): Promise<CollectionResult> {
       return fail(`Apify collection ${why}.${run.statusMessage ? ` ${run.statusMessage}` : ""}`);
     }
 
-    const items = await getDatasetItems(run.datasetId, analysis.comment_limit);
-    const { comments, errors } = mapApifyItems(items);
+    let comments, errors;
+    if (analysis.post_type === "reddit") {
+      const items = await getDatasetItems(run.datasetId, analysis.comment_limit + 1);
+      const thread = mapApifyRedditItems(items, analysis.comment_limit);
+      ({ comments, errors } = thread);
+      if (thread.details.caption || thread.details.post_owner) {
+        await supabase.from("analyses").update({ ...thread.details, details_status: "done" }).eq("id", id);
+        if (thread.title) await supabase.from("analyses").update({ title: thread.title }).eq("id", id).is("title", null);
+      }
+    } else {
+      const items = await getDatasetItems(run.datasetId, analysis.comment_limit);
+      ({ comments, errors } = mapApifyItems(items));
+    }
 
     if (comments.length === 0) {
       return fail(
@@ -368,6 +391,7 @@ export async function fetchDetails(id: string): Promise<DetailsResult> {
   if (analysis.details_status === "fetching") return { ok: true };
 
   if (analysis.post_type === "reddit") {
+    if (!redditConfigured()) return { ok: true }; // via Apify, details arrive with the comments
     const parsed = parseRedditUrl(analysis.post_url);
     if (!parsed.ok) return { ok: false, message: parsed.error };
     try {

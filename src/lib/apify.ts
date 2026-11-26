@@ -94,6 +94,28 @@ export async function startCommentRun(postUrl: string, limit: number, includeRep
   return { runId: json.data.id as string };
 }
 
+// Reddit through an Apify scraper. Default: "Reddit Scraper Lite"; most Apify Reddit tools
+// use the same input and output fields. Set APIFY_REDDIT_ACTOR in Vercel to switch.
+const REDDIT_ACTOR = (process.env.APIFY_REDDIT_ACTOR ?? "trudax/reddit-scraper-lite").trim().replace("/", "~");
+
+export async function startRedditRun(postUrl: string, limit: number) {
+  const input = {
+    startUrls: [{ url: postUrl }],
+    maxComments: limit,
+    maxItems: limit + 1,
+    maxPostCount: 1,
+    skipUserPosts: true,
+    skipCommunity: true,
+    proxy: { useApifyProxy: true },
+  };
+  // maxItems caps what Apify will charge for (comments + the post itself).
+  const json = await apifyFetch(`/acts/${REDDIT_ACTOR}/runs?maxItems=${limit + 1}`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return { runId: json.data.id as string };
+}
+
 export type ApifyRunStatus =
   | "READY"
   | "RUNNING"

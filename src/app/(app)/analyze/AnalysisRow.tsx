@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { COMMENT_LIMITS, estimateApifyCost, isAllOption, limitLabel } from "@/lib/pricing";
 
-const REDDIT_LIMITS = [50, 200, 500] as const;
+const REDDIT_LIMITS = [50, 200, 500, 1000] as const;
 import { SentimentBar, SentimentLegend } from "@/components/charts";
 import { moveToDashboard } from "../dashboards/actions";
 import {
@@ -467,7 +467,7 @@ export function AnalysisRow({ row }: { row: AnalysisRowData }) {
           </label>
           <span className="text-xs text-faint">
             {isReddit
-              ? "Free: uses Reddit’s official API (up to 500 comments per thread)."
+              ? "Reddit: free with official Reddit keys (up to 500), otherwise via Apify at about $3–5 per 1,000 comments."
               : isAllOption(limit)
               ? "You pay only for comments actually collected: about $2.30–2.70 per 1,000 (e.g. ~1,100 comments ≈ $2.50–3.00)"
               : `Estimated Apify cost: about ${estimateApifyCost(limit)}`}
@@ -497,7 +497,7 @@ export function AnalysisRow({ row }: { row: AnalysisRowData }) {
                   className="brand-gradient inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
                 >
                   {pending && <Loader2 size={13} className="animate-spin" />}
-                  Confirm · {isReddit ? "free" : isAllOption(limit) ? "max $13.50" : `up to ${estimateApifyCost(limit).split("–")[1]}`}
+                  Confirm · {isReddit ? `up to ${limit} comments` : isAllOption(limit) ? "max $13.50" : `up to ${estimateApifyCost(limit).split("–")[1]}`}
                 </button>
               </>
             )}

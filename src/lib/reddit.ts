@@ -154,3 +154,53 @@ export async function fetchRedditThread(postId: string, limit: number): Promise<
     comments,
   };
 }
+
+// ---------- Apify Reddit scraper output ----------
+// Items are tagged dataType "post" or "comment" (field names shared by most Apify Reddit tools).
+
+export function mapApifyRedditItems(items: Record<string, unknown>[], limit: number): RedditThread & { errors: string[] } {
+  const kind = (it: Record<string, unknown>) => s(it.dataType || it.type).toLowerCase();
+  const errors = items.map((it) => s(it.error || it.errorMessage)).filter(Boolean);
+  const post = items.find((it) => kind(it) === "post") ?? {};
+  const raw = items.filter((it) => kind(it) === "comment");
+  const idOf = (it: Record<string, unknown>) => (s(it.parsedId) || s(it.id) || s(it.commentId)).replace(/^t1_/, "");
+  const replies = new Map<string, number>();
+  for (const it of raw) {
+    const parent = s(it.parentId).replace(/^t1_/, "");
+    if (parent && !parent.startsWith("t3_")) replies.set(parent, (replies.get(parent) ?? 0) + 1);
+  }
+  const date = (v: unknown) => (typeof v === "number" ? iso(v) : typeof v === "string" && !Number.isNaN(Date.parse(v)) ? new Date(v).toISOString() : null);
+  const seen = new Set<string>();
+  const comments: CollectedComment[] = [];
+  for (const it of raw) {
+    const id = idOf(it);
+    const body = (s(it.body) || s(it.text)).trim();
+    if (!id || seen.has(id) || !body || body === "[deleted]" || body === "[removed]") continue;
+    seen.add(id);
+    comments.push({
+      external_id: id,
+      text: maskUsers(body).slice(0, 4000),
+      author_username: null, // privacy: never stored
+      posted_at: date(it.createdAt ?? it.created_utc),
+      like_count: n(it.upVotes ?? it.score),
+      reply_count: replies.get(id) ?? n(it.numberOfreplies ?? it.numberOfReplies) ?? 0,
+      raw: { id, score: n(it.upVotes ?? it.score), depth: n(it.depth), source: "reddit-apify" },
+    });
+    if (comments.length >= limit) break;
+  }
+  const title = s(post.title).trim();
+  const body = s(post.body).trim();
+  return {
+    title: title.slice(0, 120),
+    details: {
+      caption: maskUsers([title, body].filter(Boolean).join("\n\n")).slice(0, 3000),
+      post_owner: s(post.communityName) || (s(post.parsedCommunityName) ? `r/${s(post.parsedCommunityName)}` : null),
+      likes_count: n(post.upVotes ?? post.score),
+      views_count: null,
+      comments_reported: n(post.numberOfComments ?? post.commentsCount),
+      post_published_at: date(post.createdAt ?? post.created_utc),
+    },
+    comments,
+    errors,
+  };
+}
