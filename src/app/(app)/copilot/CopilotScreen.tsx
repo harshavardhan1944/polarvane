@@ -5,6 +5,7 @@ import { listDashboards, loadPostTitles, postLabel } from "@/lib/dashboards";
 import { computeInsights, loadComments } from "@/lib/insights";
 import { createClient } from "@/lib/supabase/server";
 import { listChats, loadChat, type StoredMessage } from "./actions";
+import { AgentRunner } from "../agent/AgentRunner";
 import { TalonChat, type TalonSummary } from "./TalonChat";
 
 // Shared by Talon (all sources) and the Reddit section (Reddit threads only).
@@ -37,17 +38,53 @@ export async function CopilotScreen({
     .map((a) => ({ id: a.id, label: postLabel(a, titles) }));
   const switcher = <DashboardSwitcher dashboards={dashboards} current={current} basePath={basePath} />;
 
+  // "Ask Polarvane" has two modes: quick answers (Talon) and a full plan (the agent). Reddit pages use quick answers only.
+  const plan = !source && sp.mode === "plan";
+  const modeTabs = !source && (
+    <div className="mb-4 inline-flex rounded-xl border border-navy-700 bg-navy-900/60 p-1 text-sm" role="tablist">
+      <Link
+        href={`${basePath}${current ? `?d=${current}` : ""}`}
+        role="tab"
+        aria-selected={!plan}
+        className={`rounded-lg px-4 py-2 ${!plan ? "bg-navy-700 text-ink shadow" : "text-muted hover:text-ink"}`}
+      >
+        Quick answer
+      </Link>
+      <Link
+        href={`${basePath}?mode=plan`}
+        role="tab"
+        aria-selected={plan}
+        className={`rounded-lg px-4 py-2 ${plan ? "bg-navy-700 text-ink shadow" : "text-muted hover:text-ink"}`}
+      >
+        Full plan (agent)
+      </Link>
+    </div>
+  );
+  if (plan) {
+    return (
+      <>
+        <PageHeader
+          title="Ask Polarvane"
+          subtitle="Full plan: give a goal, and the agent runs Polarvane's tools on your comments step by step and writes one plan. It only reads and suggests; it never posts."
+        />
+        {modeTabs}
+        <AgentRunner dashboards={dashboards ?? []} />
+      </>
+    );
+  }
+
   if (posts.length === 0) {
     return (
       <>
         <PageHeader
-          title={source === "reddit" ? "Ask Talon about Reddit" : "Talon Copilot"}
+          title={source === "reddit" ? "Ask Talon about Reddit" : "Ask Polarvane"}
           subtitle={
             source === "reddit"
               ? "Talon answers only from your Reddit threads' comments."
               : "Ask questions about your audience in plain English."
           }
         />
+        {modeTabs}
         {switcher}
         <div className="panel p-6 text-sm text-muted">
           {source === "reddit"
@@ -96,7 +133,8 @@ export async function CopilotScreen({
 
   return (
     <>
-      <h1 className="sr-only">{source === "reddit" ? "Ask Talon about Reddit" : "Talon copilot"}</h1>
+      <h1 className="sr-only">{source === "reddit" ? "Ask Talon about Reddit" : "Ask Polarvane"}</h1>
+      {modeTabs}
       {source === "reddit" && (
         <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-orange-400/30 bg-orange-400/10 px-3 py-1 text-xs text-orange-200">
           Reddit only: Talon answers from {posts.length} Reddit thread{posts.length === 1 ? "" : "s"}
