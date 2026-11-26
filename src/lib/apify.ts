@@ -116,6 +116,25 @@ export async function startRedditRun(postUrl: string, limit: number) {
   return { runId: json.data.id as string };
 }
 
+// Collects comments from several Reddit threads in one run (used by the launch planner).
+export async function startRedditRunMany(urls: string[], perThread: number) {
+  const total = urls.length * (perThread + 1);
+  const input = {
+    startUrls: urls.map((url) => ({ url })),
+    maxComments: perThread,
+    maxItems: total,
+    maxPostCount: urls.length,
+    skipUserPosts: true,
+    skipCommunity: true,
+    proxy: { useApifyProxy: true },
+  };
+  const json = await apifyFetch(`/acts/${REDDIT_ACTOR}/runs?maxItems=${total}`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return { runId: json.data.id as string };
+}
+
 // Finds Reddit threads for a keyword (posts only, no comments: cheap). Uses a search tool that
 // needs no Reddit login. Set APIFY_REDDIT_SEARCH_ACTOR in Vercel to switch.
 const REDDIT_SEARCH_ACTOR = (process.env.APIFY_REDDIT_SEARCH_ACTOR ?? "harshmaur/reddit-search-scraper")

@@ -15,6 +15,7 @@ import {
   MessageSquareReply,
   MessagesSquare,
   PlusCircle,
+  Rocket,
   Menu,
   X,
 } from "lucide-react";
@@ -26,6 +27,7 @@ const NAV_GROUPS = [
     items: [
       { href: "/", label: "Dashboard", icon: LayoutDashboard },
       { href: "/copilot", label: "Ask Polarvane", icon: Bot },
+      { href: "/launch", label: "Launch planner", icon: Rocket },
       { href: "/comments", label: "Comments", icon: MessageSquareText },
       { href: "/ai-visibility", label: "AI visibility", icon: Radar },
       { href: "/ad-recommendations", label: "Ad recommendations", icon: Megaphone },
