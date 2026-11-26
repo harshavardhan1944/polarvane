@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { AlertCircle, Download, Loader2, Megaphone, Quote } from "lucide-react";
-import type { AdBrief, BriefItem, PostSignals } from "@/lib/adbrief";
+import { AlertCircle, Clapperboard, Download, Loader2, Megaphone, Quote } from "lucide-react";
+import type { AdBrief, AdScript, BriefItem, PostSignals } from "@/lib/adbrief";
 import { makeBrief } from "./actions";
 import { VideoChecker } from "./VideoChecker";
 
@@ -63,6 +63,61 @@ function Section({ title, items, extra }: { title: string; items: BriefItem[]; e
   );
 }
 
+// Shows [confirm: …] placeholders in amber so they're filled in before filming.
+function WithBlanks({ text }: { text: string }) {
+  const parts = text.split(/(\[[^\]]+\])/g);
+  return (
+    <>
+      {parts.map((p, i) =>
+        /^\[.*\]$/.test(p) ? (
+          <span key={i} className="rounded bg-amber-400/15 px-1 text-amber-200">
+            {p}
+          </span>
+        ) : (
+          <span key={i}>{p}</span>
+        ),
+      )}
+    </>
+  );
+}
+
+function ScriptCard({ s, n }: { s: AdScript; n: number }) {
+  return (
+    <li className="rounded-lg border border-navy-700 bg-navy-900 p-4">
+      <div className="flex flex-wrap items-baseline gap-2">
+        <p className="text-sm font-medium">
+          Script {n}: {s.title}
+        </p>
+        <span className="text-xs text-faint">
+          {[s.format, s.length].filter(Boolean).join(" · ")}
+        </span>
+      </div>
+      <ol className="mt-3 space-y-2">
+        {s.scenes.map((sc, i) => (
+          <li key={i} className="grid gap-1 rounded-md border border-navy-700/70 p-2.5 sm:grid-cols-[64px_1fr_1fr] sm:gap-3">
+            <span className="font-mono text-[11px] text-faint">{sc.time || `Scene ${i + 1}`}</span>
+            <p className="text-xs text-muted">
+              <span className="text-faint">Show: </span>
+              <WithBlanks text={sc.show} />
+            </p>
+            <p className="text-xs text-ink">
+              <span className="text-faint">Say: </span>“<WithBlanks text={sc.say} />”
+            </p>
+          </li>
+        ))}
+      </ol>
+      {s.cta && (
+        <p className="mt-2 text-xs">
+          <span className="text-faint">Ends with: </span>
+          <WithBlanks text={s.cta} />
+        </p>
+      )}
+      {s.why && <p className="mt-2 text-xs text-muted">Why: {s.why}</p>}
+      <Evidence items={s.evidence} />
+    </li>
+  );
+}
+
 function briefToText(brief: AdBrief, posts: string[]) {
   const lines: string[] = [`AD BRIEF (Polarvane)`, `Based on ${brief.commentsUsed} comments from: ${posts.join(", ")}`, ""];
   if (brief.summary) lines.push(brief.summary, "");
@@ -80,6 +135,18 @@ function briefToText(brief: AdBrief, posts: string[]) {
   block("Doubts to answer", brief.doubts, (i) => comments(brief.doubts[i].mentions));
   block("What to show", brief.show);
   block("What to avoid", brief.avoid);
+  if (brief.scripts?.length) {
+    lines.push("AD SCRIPT IDEAS");
+    brief.scripts.forEach((sc, i) => {
+      lines.push(`Script ${i + 1}: ${sc.title} (${[sc.format, sc.length].filter(Boolean).join(", ")})`);
+      sc.scenes.forEach((x) => lines.push(`  ${x.time || "-"}  SHOW: ${x.show}`, `          SAY: "${x.say}"`));
+      if (sc.cta) lines.push(`  ENDS WITH: ${sc.cta}`);
+      if (sc.why) lines.push(`  Why: ${sc.why}`);
+      sc.evidence.forEach((e) => lines.push(`  Comment: "${e}"`));
+      lines.push("");
+    });
+    lines.push("Fill in every [confirm: ...] part with checked facts before filming.", "");
+  }
   if (brief.verify.length) {
     lines.push("CONFIRM BEFORE USING IN ADS");
     brief.verify.forEach((v) => lines.push(`- ${v}`));
@@ -217,6 +284,22 @@ export function AdRecommendations({
           <Section title="Doubts to answer in the ad" items={brief.doubts} extra={(i) => comments(brief.doubts[i].mentions)} />
           <Section title="What to show" items={brief.show} />
           <Section title="What to avoid" items={brief.avoid} />
+          {brief.scripts?.length > 0 && (
+            <div>
+              <h3 className="mb-1 flex items-center gap-1.5 text-sm font-medium">
+                <Clapperboard size={14} /> Ad script ideas
+              </h3>
+              <p className="mb-2 text-xs text-faint">
+                Built from what customers said. Fill in the <span className="text-amber-200">[confirm]</span> parts with checked
+                facts before filming.
+              </p>
+              <ul className="space-y-3">
+                {brief.scripts.map((sc, i) => (
+                  <ScriptCard key={sc.title} s={sc} n={i + 1} />
+                ))}
+              </ul>
+            </div>
+          )}
           {brief.verify.length > 0 && (
             <div className="rounded-lg border border-amber-400/30 bg-amber-400/5 p-3">
               <p className="text-sm font-medium text-amber-200">Confirm before using in ads</p>

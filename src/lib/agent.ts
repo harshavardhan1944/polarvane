@@ -171,7 +171,7 @@ async function runTool(
     const short = (items: { text: string; evidence: string[] }[]) =>
       items.map((i) => ({ text: i.text, customer_says: i.evidence.slice(0, 2) }));
     return {
-      summary: `${brief.hooks.length} hooks, ${brief.doubts.length} doubts to answer, from ${brief.commentsUsed} comments.`,
+      summary: `${brief.hooks.length} hooks, ${brief.doubts.length} doubts to answer, ${brief.scripts.length} script ideas, from ${brief.commentsUsed} comments.`,
       result: {
         summary: brief.summary,
         hooks: short(brief.hooks),
@@ -179,6 +179,7 @@ async function runTool(
         show: short(brief.show),
         avoid: short(brief.avoid),
         verify: brief.verify,
+        script_ideas: brief.scripts.map((sc) => ({ title: sc.title, format: sc.format, opening_line: sc.scenes[0]?.say ?? "" })),
       },
     };
   }

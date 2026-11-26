@@ -65,7 +65,19 @@ export type AdBrief = {
   show: BriefItem[];
   avoid: BriefItem[];
   verify: string[];
+  scripts: AdScript[];
   commentsUsed: number;
+};
+
+export type AdScene = { time: string; show: string; say: string };
+export type AdScript = {
+  title: string;
+  format: string;
+  length: string;
+  scenes: AdScene[];
+  cta: string;
+  why: string;
+  evidence: string[];
 };
 
 const ITEM = {
@@ -99,8 +111,31 @@ const SCHEMA = {
     show: { type: "ARRAY", items: ITEM },
     avoid: { type: "ARRAY", items: ITEM },
     verify: { type: "ARRAY", items: { type: "STRING" } },
+    scripts: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          title: { type: "STRING" },
+          format: { type: "STRING" },
+          length: { type: "STRING" },
+          scenes: {
+            type: "ARRAY",
+            items: {
+              type: "OBJECT",
+              properties: { time: { type: "STRING" }, show: { type: "STRING" }, say: { type: "STRING" } },
+              required: ["time", "show", "say"],
+            },
+          },
+          cta: { type: "STRING" },
+          why: { type: "STRING" },
+          refs: { type: "ARRAY", items: { type: "STRING" } },
+        },
+        required: ["title", "format", "length", "scenes", "cta", "why", "refs"],
+      },
+    },
   },
-  required: ["summary", "hooks", "doubts", "show", "avoid", "verify"],
+  required: ["summary", "hooks", "doubts", "show", "avoid", "verify", "scripts"],
 };
 
 const SYSTEM = `You are a performance-marketing strategist writing a short ad brief for the brand's next paid social ads (Instagram/Facebook Reels and UGC).
@@ -112,6 +147,12 @@ Write:
 - show: 2–4 things the video should show (e.g. product name on screen, before/after, the shade result). detail = why.
 - avoid: 0–3 things the comments suggest NOT to do (e.g. creator-only focus that drew no product interest). detail = why.
 - verify: claims the brand must confirm before using them in an ad (e.g. "lasts 6 weeks", availability in a country). Short phrases. Include one item for every doubt whose answer is a product fact (e.g. "Is SPF 20 enough protection for the scalp?").
+- scripts: 1–2 short video ad script ideas (15–30 seconds, vertical Reel/UGC style), each built around a different customer doubt or praise from the comments:
+  title = short name of the idea; format = e.g. "UGC testimonial", "problem → solution demo", "myth vs fact"; length = e.g. "20 sec";
+  scenes = 3–5 beats in order, each with time (e.g. "0–3s"), show (what is on screen) and say (spoken line or on-screen text, short and natural);
+  the first scene is the hook; one scene must answer the main doubt; cta = closing line;
+  why = one sentence linking the idea to what customers said; refs = 1–4 comment references it is based on.
+  Never write a product fact as true in "say": use a placeholder like [confirm: tested on oily skin] or [confirm: price] wherever the brand must supply the fact.
 Rules:
 - Base every point ONLY on the comments. Never invent product facts, prices, results or availability. If customers ask something, the ad should answer it, but the answer must come from the brand.
 - Read tone carefully. Sarcasm, jokes and mockery (e.g. "Because wearing a hat is too mainstream?") express doubt, not support. Never cite a sarcastic, doubtful or negative comment as support for a hook or a show item; such comments can only support a doubt or an avoid item.
@@ -167,7 +208,28 @@ export async function generateAdBrief(
     .filter((x) => x.text && x.evidence.length > 0)
     .slice(0, 5);
 
+  const scripts: AdScript[] = (Array.isArray(parsed?.scripts) ? parsed.scripts : [])
+    .map((x: Record<string, unknown>) => ({
+      title: String(x?.title ?? "").trim().slice(0, 120),
+      format: String(x?.format ?? "").trim().slice(0, 60),
+      length: String(x?.length ?? "").trim().slice(0, 20),
+      scenes: (Array.isArray(x?.scenes) ? (x.scenes as Record<string, unknown>[]) : [])
+        .map((sc) => ({
+          time: String(sc?.time ?? "").trim().slice(0, 16),
+          show: String(sc?.show ?? "").trim().slice(0, 240),
+          say: String(sc?.say ?? "").trim().slice(0, 240),
+        }))
+        .filter((sc) => sc.show || sc.say)
+        .slice(0, 6),
+      cta: String(x?.cta ?? "").trim().slice(0, 160),
+      why: String(x?.why ?? "").trim().slice(0, 300),
+      evidence: evidenceOf(x?.refs),
+    }))
+    .filter((x) => x.title && x.scenes.length >= 2 && x.evidence.length > 0) // must be backed by real comments
+    .slice(0, 2);
+
   return {
+    scripts,
     summary: String(parsed?.summary ?? "").trim().slice(0, 400),
     hooks: items(parsed?.hooks, 5),
     doubts,
