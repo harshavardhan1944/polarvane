@@ -116,6 +116,31 @@ export async function startRedditRun(postUrl: string, limit: number) {
   return { runId: json.data.id as string };
 }
 
+// Finds Reddit threads for a keyword (posts only, no comments: cheap).
+export async function startRedditSearch(query: string, time: string, maxPosts: number) {
+  const input = {
+    searches: [query],
+    searchPosts: true,
+    searchComments: false,
+    searchCommunities: false,
+    searchUsers: false,
+    sort: "relevance",
+    time,
+    maxPostCount: maxPosts,
+    maxItems: maxPosts,
+    skipComments: true,
+    skipUserPosts: true,
+    skipCommunity: true,
+    includeNSFW: false,
+    proxy: { useApifyProxy: true },
+  };
+  const json = await apifyFetch(`/acts/${REDDIT_ACTOR}/runs?maxItems=${maxPosts}`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return { runId: json.data.id as string };
+}
+
 export type ApifyRunStatus =
   | "READY"
   | "RUNNING"

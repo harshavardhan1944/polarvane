@@ -1,5 +1,6 @@
 import "server-only";
 import type { CollectedComment } from "./apify";
+import { parseRedditUrl } from "./reddit-url";
 export { isRedditLink, parseRedditUrl } from "./reddit-url";
 
 // Reddit through the official Data API (OAuth, read-only, app-only token).
@@ -203,4 +204,37 @@ export function mapApifyRedditItems(items: Record<string, unknown>[], limit: num
     comments,
     errors,
   };
+}
+
+// ---------- Reddit search results (Apify) ----------
+
+export type RedditSearchHit = {
+  url: string;
+  title: string;
+  community: string | null;
+  comments: number | null;
+  upvotes: number | null;
+  date: string | null;
+};
+
+export function mapRedditSearchItems(items: Record<string, unknown>[]): RedditSearchHit[] {
+  const out: RedditSearchHit[] = [];
+  const seen = new Set<string>();
+  for (const it of items) {
+    if (s(it.dataType || it.type).toLowerCase() !== "post") continue;
+    const candidates = [s(it.url), s(it.postUrl), s(it.permalink) ? `https://www.reddit.com${s(it.permalink)}` : ""];
+    const parsed = candidates.map((c) => (c ? parseRedditUrl(c) : null)).find((p) => p?.ok);
+    if (!parsed || !parsed.ok || seen.has(parsed.postId)) continue;
+    seen.add(parsed.postId);
+    const created = it.createdAt ?? it.created_utc;
+    out.push({
+      url: parsed.canonicalUrl,
+      title: maskUsers(s(it.title).trim()).slice(0, 200) || "(untitled)",
+      community: s(it.communityName) || null,
+      comments: n(it.numberOfComments ?? it.commentsCount ?? it.num_comments),
+      upvotes: n(it.upVotes ?? it.score),
+      date: typeof created === "number" ? iso(created) : typeof created === "string" && !Number.isNaN(Date.parse(created)) ? new Date(created).toISOString() : null,
+    });
+  }
+  return out.sort((a, b) => (b.comments ?? 0) - (a.comments ?? 0));
 }
