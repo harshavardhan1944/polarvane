@@ -11,6 +11,7 @@ import {
   Plug,
   Radar,
   Megaphone,
+  Bot,
   MessageSquareReply,
   Menu,
   X,
@@ -22,6 +23,7 @@ const NAV_GROUPS = [
     label: "Insights",
     items: [
       { href: "/", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/agent", label: "Polarvane agent", icon: Bot },
       { href: "/copilot", label: "Talon copilot", icon: Sparkles },
       { href: "/comments", label: "Comments", icon: MessageSquareText },
       { href: "/ai-visibility", label: "AI visibility", icon: Radar },
