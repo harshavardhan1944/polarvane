@@ -13,6 +13,8 @@ import {
   Megaphone,
   Bot,
   MessageSquareReply,
+  MessagesSquare,
+  PlusCircle,
   Menu,
   X,
 } from "lucide-react";
@@ -32,9 +34,17 @@ const NAV_GROUPS = [
     ],
   },
   {
+    label: "Reddit",
+    items: [
+      { href: "/reddit", label: "Reddit dashboard", icon: MessagesSquare },
+      { href: "/reddit/talon", label: "Ask Talon (Reddit)", icon: Sparkles },
+      { href: "/reddit/add", label: "Add Reddit threads", icon: PlusCircle },
+    ],
+  },
+  {
     label: "Data",
     items: [
-      { href: "/analyze", label: "Analyze a post", icon: Link2 },
+      { href: "/analyze", label: "Add Instagram post", icon: Link2 },
       { href: "/integrations", label: "Integrations", icon: Plug },
     ],
   },
@@ -51,7 +61,7 @@ export function Sidebar({ footer }: { footer: React.ReactNode }) {
           <p className="mb-1.5 px-3 text-xs text-faint">{g.label}</p>
           <div className="flex flex-col gap-0.5">
             {g.items.map(({ href, label, icon: Icon }) => {
-              const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+              const active = href === "/" || href === "/reddit" ? pathname === href : pathname.startsWith(href);
               return (
                 <Link
                   key={href}

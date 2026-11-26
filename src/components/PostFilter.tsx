@@ -6,10 +6,12 @@ export function PostFilter({
   posts,
   value,
   dashboard = "",
+  basePath = "/",
 }: {
   posts: { id: string; label: string }[];
   value: string;
   dashboard?: string;
+  basePath?: string;
 }) {
   const router = useRouter();
   return (
@@ -21,7 +23,7 @@ export function PostFilter({
         if (dashboard) params.set("d", dashboard);
         if (e.target.value) params.set("post", e.target.value);
         const qs = params.toString();
-        router.push(qs ? `/?${qs}` : "/");
+        router.push(qs ? `${basePath}?${qs}` : basePath);
       }}
       className="rounded-lg border border-navy-700 bg-navy-850 px-3 py-2 text-sm text-ink outline-none focus:border-brand-blue"
     >

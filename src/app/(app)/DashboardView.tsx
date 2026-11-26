@@ -23,7 +23,15 @@ export function DashboardView({
   insights,
   postCount,
   notice,
+  basePath = "/",
+  talonPath = "/copilot",
+  addHref,
+  unit = "post",
 }: {
+  basePath?: string;
+  talonPath?: string;
+  addHref?: string;
+  unit?: "post" | "thread";
   dashboardId?: string;
   dashboardName?: string;
   posts: { id: string; label: string }[];
@@ -44,7 +52,7 @@ export function DashboardView({
     {
       label: "Comments analyzed",
       value: ins.total.toLocaleString(),
-      sub: `across ${postCount} ${postCount === 1 ? "post" : "posts"}`,
+      sub: `across ${postCount} ${unit}${postCount === 1 ? "" : "s"}`,
       icon: MessageSquareText,
       chip: "bg-brand-blue/15 text-[#8fb0ff] ring-brand-blue/30",
       glow: "rgba(91,140,255,0.45)",
@@ -99,12 +107,12 @@ export function DashboardView({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <PostFilter posts={posts} value={selected} dashboard={dashboardId} />
+          <PostFilter posts={posts} value={selected} dashboard={dashboardId} basePath={basePath} />
           <Link
-            href={`/analyze${dashboardId ? `?d=${dashboardId}` : ""}`}
+            href={addHref ?? `/analyze${dashboardId ? `?d=${dashboardId}` : ""}`}
             className="brand-gradient rounded-lg px-3 py-2 text-sm font-medium text-white"
           >
-            Add post
+            Add {unit}
           </Link>
           <a
             href={`/api/export${selected ? `?analysis=${selected}` : ""}`}
@@ -245,7 +253,7 @@ export function DashboardView({
               <h2 className="text-lg font-semibold">Ask Talon</h2>
             </div>
             <p className="mt-3 text-sm text-muted">Answers and content ideas, backed by quotes from your comments.</p>
-            <form action="/copilot" method="get" className="mt-5">
+            <form action={talonPath} method="get" className="mt-5">
               <input type="hidden" name="post" value={selected} />
               <input type="hidden" name="d" value={dashboardId} />
               <label htmlFor="ask-talon" className="sr-only">
@@ -273,7 +281,7 @@ export function DashboardView({
               ].map((q) => (
                 <Link
                   key={q}
-                  href={`/copilot?q=${encodeURIComponent(q)}${selected ? `&post=${selected}` : ""}${
+                  href={`${talonPath}?q=${encodeURIComponent(q)}${selected ? `&post=${selected}` : ""}${
                     dashboardId ? `&d=${dashboardId}` : ""
                   }`}
                   className="group flex items-center justify-between gap-3 py-3 text-sm text-muted transition-colors hover:text-ink"

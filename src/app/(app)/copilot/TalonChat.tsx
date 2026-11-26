@@ -45,7 +45,9 @@ export function TalonChat({
   initialChatId = null,
   dashboardId = "",
   dashboardName = "",
+  source = "",
 }: {
+  source?: "" | "reddit" | "instagram";
   posts: { id: string; label: string }[];
   summary: TalonSummary;
   initialQuestion?: string;
@@ -87,7 +89,7 @@ export function TalonChat({
     setInput("");
     startTransition(async () => {
       try {
-        const r = await sendToTalon(q, chatId, postId, dashboardId);
+        const r = await sendToTalon(q, chatId, postId, dashboardId, source);
         if (r.chatId) setChatId(r.chatId);
         setHistoryWarning(r.historyWarning ?? null);
         setMessages((m) => [

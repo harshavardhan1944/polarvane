@@ -97,6 +97,7 @@ export async function sendToTalon(
   chatIdIn: string | null,
   postId: string,
   dashboardId = "",
+  source: "" | "reddit" | "instagram" = "",
 ): Promise<TalonReply> {
   const q = (question ?? "").trim();
   if (!q) return { ok: false, message: "Please type a question.", chatId: chatIdIn };
@@ -118,6 +119,18 @@ export async function sendToTalon(
       .eq("status", "completed");
     dashPostIds = (ps ?? []).map((p) => p.id as string);
     scopeLabel = `the dashboard "${d?.name ?? "dashboard"}" (${dashPostIds.length} posts)`;
+  }
+  // Source scope: only Reddit threads, or only Instagram posts.
+  if (source === "reddit" || source === "instagram") {
+    let sq = supabase.from("analyses").select("id").eq("status", "completed");
+    sq = source === "reddit" ? sq.eq("post_type", "reddit") : sq.neq("post_type", "reddit");
+    if (dash) sq = sq.eq("dashboard_id", dash);
+    const { data: ps } = await sq;
+    dashPostIds = (ps ?? []).map((p) => p.id as string);
+    const where = dash ? scopeLabel.replace(/^the dashboard /, "in the dashboard ").replace(/ \(\d+ posts\)$/, "") : "";
+    scopeLabel = source === "reddit"
+      ? `Reddit threads only${where ? ` ${where}` : ""} (${dashPostIds.length} threads)`
+      : `Instagram posts only${where ? ` ${where}` : ""} (${dashPostIds.length} posts)`;
   }
   if (postId) {
     if (!UUID.test(postId)) return { ok: false, message: "Invalid post.", chatId: chatIdIn };
