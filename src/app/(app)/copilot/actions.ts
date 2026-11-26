@@ -25,6 +25,12 @@ export type StoredMessage =
   | { role: "error"; text: string };
 
 const UUID = /^[0-9a-f-]{36}$/i;
+
+// Which comments a chat answers from: "" = all sources.
+export type TalonSource = "" | "reddit" | "instagram";
+function cleanSource(source: string): TalonSource {
+  return source === "reddit" || source === "instagram" ? source : "";
+}
 const HISTORY_MISSING =
   "Chat history isn’t set up yet, so this conversation won’t be saved. Run the Talon history setup script in Supabase.";
 
@@ -41,12 +47,17 @@ async function getUser() {
 }
 
 // Chats for one dashboard ("" = chats not tied to a dashboard, i.e. "All posts").
-export async function listChats(dashboardId = ""): Promise<ChatSummary[]> {
+export async function listChats(dashboardId = "", source: TalonSource = ""): Promise<ChatSummary[]> {
   const { supabase, user } = await getUser();
   if (!user) return [];
-  let q = supabase.from("talon_chats").select("id, title, updated_at").order("updated_at", { ascending: false }).limit(50);
-  q = dashboardId && UUID.test(dashboardId) ? q.eq("dashboard_id", dashboardId) : q.is("dashboard_id", null);
-  const { data, error } = await q;
+  const build = (bySource: boolean) => {
+    let q = supabase.from("talon_chats").select("id, title, updated_at").order("updated_at", { ascending: false }).limit(50);
+    q = dashboardId && UUID.test(dashboardId) ? q.eq("dashboard_id", dashboardId) : q.is("dashboard_id", null);
+    return bySource ? q.eq("source", cleanSource(source)) : q;
+  };
+  let { data, error } = await build(true);
+  // The per-source update isn't applied yet: list chats without it.
+  if (error && /source|schema cache/i.test(error.message)) ({ data, error } = await build(false));
   if (error) {
     // The per-dashboard update isn't applied yet: show all chats.
     const { data: all } = await supabase
@@ -97,8 +108,9 @@ export async function sendToTalon(
   chatIdIn: string | null,
   postId: string,
   dashboardId = "",
-  source: "" | "reddit" | "instagram" = "",
+  sourceIn: TalonSource = "",
 ): Promise<TalonReply> {
+  const source = cleanSource(sourceIn);
   const q = (question ?? "").trim();
   if (!q) return { ok: false, message: "Please type a question.", chatId: chatIdIn };
   if (q.length > 1000) return { ok: false, message: "Please keep questions under 1,000 characters.", chatId: chatIdIn };
@@ -157,12 +169,12 @@ export async function sendToTalon(
   }
   if (!chatId) {
     const base: Record<string, string | null> = { user_id: user.id, title: q.slice(0, 80), post_id: postId || null };
-    let { data: chat, error } = await supabase
-      .from("talon_chats")
-      .insert(dash ? ({ ...base, dashboard_id: dash } as Record<string, string | null>) : base)
-      .select("id")
-      .single();
-    if (error && dash && /dashboard_id|schema cache/i.test(error.message)) {
+    const full: Record<string, string | null> = { ...base };
+    if (dash) full.dashboard_id = dash;
+    if (source) full.source = source;
+    let { data: chat, error } = await supabase.from("talon_chats").insert(full).select("id").single();
+    // Older databases may lack the dashboard_id or source columns: save the chat without them.
+    if (error && (dash || source) && /dashboard_id|source|schema cache/i.test(error.message)) {
       ({ data: chat, error } = await supabase.from("talon_chats").insert(base).select("id").single());
     }
     if (error) historyWarning = isMissingTable(error.message) ? HISTORY_MISSING : "This chat couldn’t be saved.";

@@ -295,7 +295,7 @@ export function AdRecommendations({
               </p>
               <ul className="space-y-3">
                 {brief.scripts.map((sc, i) => (
-                  <ScriptCard key={sc.title} s={sc} n={i + 1} />
+                  <ScriptCard key={i} s={sc} n={i + 1} />
                 ))}
               </ul>
             </div>

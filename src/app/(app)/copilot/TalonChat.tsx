@@ -98,7 +98,7 @@ export function TalonChat({
             ? { role: "talon", text: r.answer, evidence: r.evidence, total: r.total, sampled: r.sampled }
             : { role: "error", text: r.message, question: q },
         ]);
-        listChats(dashboardId).then(setChats).catch(() => {});
+        listChats(dashboardId, source).then(setChats).catch(() => {});
       } catch {
         setMessages((m) => [...m, { role: "error", text: "Lost connection. Please try again.", question: q }]);
       }
