@@ -32,7 +32,7 @@ function Evidence({ items }: { items: string[] }) {
   );
 }
 
-export function VideoChecker({ selected }: { selected: string[] }) {
+export function VideoChecker({ selected, unit = "post" }: { selected: string[]; unit?: "post" | "thread" }) {
   const [mode, setMode] = useState<"video" | "text">("video");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
@@ -59,7 +59,7 @@ export function VideoChecker({ selected }: { selected: string[] }) {
   async function run() {
     setError("");
     setResult(null);
-    if (selected.length === 0) return setError("Tick at least one post above to check against.");
+    if (selected.length === 0) return setError(`Tick at least one ${unit} above to check against.`);
     if (mode === "video" && !file) return setError("Choose the ad video first.");
     if (mode === "text" && description.trim().length < 15) return setError("Describe the ad in a few sentences.");
 
@@ -102,7 +102,7 @@ export function VideoChecker({ selected }: { selected: string[] }) {
           <Film size={18} /> Video ad checker
         </h2>
         <p className="mt-1 text-xs text-faint">
-          Before you post an ad, the AI watches it and checks what it says and shows against real comments on the ticked posts (
+          Before you post an ad, the AI watches it and checks what it says and shows against real comments on the ticked {unit}s (
           {selected.length}).
         </p>
       </div>

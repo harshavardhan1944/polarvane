@@ -90,7 +90,16 @@ function briefToText(brief: AdBrief, posts: string[]) {
 }
 
 
-export function AdRecommendations({ posts, minComments }: { posts: PostCard[]; minComments: number }) {
+export function AdRecommendations({
+  posts,
+  minComments,
+  unit = "post",
+}: {
+  posts: PostCard[];
+  minComments: number;
+  unit?: "post" | "thread";
+}) {
+  const U = unit === "thread" ? "thread" : "post";
   const scored = posts.filter((p) => p.score !== null);
   const topId = scored[0]?.id;
   const [selected, setSelected] = useState<string[]>(() =>
@@ -107,7 +116,7 @@ export function AdRecommendations({ posts, minComments }: { posts: PostCard[]; m
 
   function generate() {
     setError("");
-    if (selected.length === 0) return setError("Choose at least one post.");
+    if (selected.length === 0) return setError(`Choose at least one ${U}.`);
     start(async () => {
       const res = await makeBrief(selected);
       if (!res.ok) {
@@ -133,7 +142,7 @@ export function AdRecommendations({ posts, minComments }: { posts: PostCard[]; m
   return (
     <div className="space-y-6">
       <section className="space-y-3">
-        <h2 className="text-sm font-medium">Posts ranked by product interest</h2>
+        <h2 className="text-sm font-medium">{U === "thread" ? "Reddit threads" : "Posts"} ranked by product interest</h2>
         <div className="panel divide-y divide-navy-700">
           {posts.map((p) => (
             <label key={p.id} className="flex cursor-pointer gap-3 p-4 hover:bg-navy-850">
@@ -154,7 +163,7 @@ export function AdRecommendations({ posts, minComments }: { posts: PostCard[]; m
                   <span>About product: {pct(p.productShare)}</span>
                   <span>Only creator: {pct(p.creatorShare)}</span>
                   <span>Questions: {pct(p.questionShare)}</span>
-                  <span>Views: {num(p.views)}</span>
+                  <span>{U === "thread" ? `Upvotes: ${num(p.likes)}` : `Views: ${num(p.views)}`}</span>
                 </div>
               </div>
             </label>
@@ -162,8 +171,8 @@ export function AdRecommendations({ posts, minComments }: { posts: PostCard[]; m
         </div>
         <p className="text-xs leading-relaxed text-faint">
           Score (0–100) = share of comments about the product (50%), share of questions (30%), share of positive comments
-          (20%). It suggests which posts to test as paid ads. It does not predict sales; only the ad results show what works.
-          {anyNoFocus && " Some posts were analyzed before product focus existed; use “Re-analyze with AI” on the Analyze page to include it."}
+          (20%). It suggests which {U}s to build paid ads from. It does not predict sales; only the ad results show what works.
+          {anyNoFocus && ` Some ${U}s were analyzed before product focus existed; use “Re-analyze with AI” on their add page to include it.`}
         </p>
       </section>
 
@@ -174,7 +183,7 @@ export function AdRecommendations({ posts, minComments }: { posts: PostCard[]; m
           className="brand-gradient inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-brand-violet/20 hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {pending ? <Loader2 size={15} className="animate-spin" /> : <Megaphone size={15} />}
-          {pending ? "Writing the brief…" : `Write ad brief from ${selected.length} post${selected.length === 1 ? "" : "s"}`}
+          {pending ? "Writing the brief…" : `Write ad brief from ${selected.length} ${U}${selected.length === 1 ? "" : "s"}`}
         </button>
         {brief && (
           <button
@@ -199,7 +208,7 @@ export function AdRecommendations({ posts, minComments }: { posts: PostCard[]; m
             <p className="mt-1 text-xs text-faint">Written from {brief.commentsUsed} real comments. Every point shows the comments behind it.</p>
             {brief.commentsUsed < 60 && (
               <p className="mt-2 text-xs text-amber-200/90">
-                Based on only {brief.commentsUsed} comments. Select 2–3 posts together for a stronger brief.
+                Based on only {brief.commentsUsed} comments. Select 2–3 {U}s together for a stronger brief.
               </p>
             )}
             {brief.summary && <p className="mt-3 text-sm text-muted">{brief.summary}</p>}
@@ -220,7 +229,7 @@ export function AdRecommendations({ posts, minComments }: { posts: PostCard[]; m
           )}
         </section>
       )}
-      <VideoChecker selected={selected} />
+      <VideoChecker selected={selected} unit={U} />
     </div>
   );
 }

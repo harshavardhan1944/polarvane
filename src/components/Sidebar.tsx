@@ -38,6 +38,7 @@ const NAV_GROUPS = [
     items: [
       { href: "/reddit", label: "Reddit dashboard", icon: MessagesSquare },
       { href: "/reddit/talon", label: "Ask Talon (Reddit)", icon: Sparkles },
+      { href: "/reddit/ads", label: "Reddit ads + checker", icon: Megaphone },
       { href: "/reddit/add", label: "Add Reddit threads", icon: PlusCircle },
     ],
   },
